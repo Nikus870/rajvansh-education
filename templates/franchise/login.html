@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Franchise Login | {{ site_settings.website_name }}
+{% endblock %}
+
+{% block content %}
+
+<section class="success">
+    <div class="container narrow">
+
+        <div class="formcard">
+
+            <h1>Franchise Login</h1>
+
+            <!-- Django messages -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-danger mb-3">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- Form-level errors -->
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger mb-3">
+                    {% for error in form.non_field_errors %}
+                        <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+
+                {% for f in form %}
+                    {% include 'includes/form_field.html' with field=f %}
+                {% endfor %}
+
+                <button
+                    type="submit"
+                    class="btn btn-primary w-100"
+                >
+                    Login
+                </button>
+            </form>
+
+        </div>
+
+    </div>
+</section>
+
+{% endblock %}

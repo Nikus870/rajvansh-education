@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block title %}{{page.title}} | {{site_settings.website_name}}{% endblock %}{% block content %}<section class="pagehero"><div class="container"><span class="eyebrow">Information</span><h1>{{page.title}}</h1></div></section><section class="section"><div class="container narrow">{{page.content|linebreaks}}</div></section>{% endblock %}

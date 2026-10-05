@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Activate Franchise Account | {{ site_settings.website_name }}
+{% endblock %}
+
+{% block content %}
+
+<section class="pagehero">
+    <div class="container">
+        <span class="eyebrow">Franchise</span>
+        <h1>Activate Your Account</h1>
+        <p>
+            Set a password to activate your franchise partner account.
+        </p>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container narrow">
+
+        <div class="formcard">
+
+            <h2>Set Your Password</h2>
+
+            <p class="text-muted">
+                Account:
+                <strong>{{ application.email }}</strong>
+            </p>
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                        <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+
+                {% for field in form %}
+                    {% include 'includes/form_field.html' with field=field %}
+                {% endfor %}
+
+                <button
+                    type="submit"
+                    class="btn btn-primary btn-lg w-100"
+                >
+                    Activate Account
+                </button>
+            </form>
+
+        </div>
+
+    </div>
+</section>
+
+{% endblock %}

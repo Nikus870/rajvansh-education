@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Courses | {{ site_settings.website_name }}
+{% endblock %}
+
+{% block content %}
+
+<section class="pagehero">
+    <div class="container">
+        <span class="eyebrow">Our Courses</span>
+
+        <h1>Explore Our Courses</h1>
+
+        <p class="mt-2 mb-0">
+            Explore the courses available through
+            {{ site_settings.website_name }}.
+        </p>
+    </div>
+</section>
+
+
+<section class="section">
+    <div class="container">
+
+        <div class="row g-4">
+
+            {% for c in page_obj %}
+
+            <div class="col-md-6 col-lg-4">
+
+                <article class="cardx h-100">
+
+                    <div class="course-image">
+
+                        {% if c.image %}
+                            <img
+                                src="{{ c.image.url }}"
+                                alt="{{ c.name }}"
+                            >
+                        {% else %}
+                            <i class="bi bi-book-half"></i>
+                        {% endif %}
+
+                    </div>
+
+
+                    <div class="p-4">
+
+                        <h3>{{ c.name }}</h3>
+
+                        {% if c.short_description %}
+                            <p>{{ c.short_description }}</p>
+                        {% endif %}
+
+
+                        <small>
+
+                            {% if c.category %}
+                                {{ c.category.name }}
+                            {% endif %}
+
+                            {% if c.duration %}
+                                · {{ c.duration }}
+                            {% endif %}
+
+                            {% if c.study_mode_label %}
+                                · {{ c.study_mode_label }}
+                            {% endif %}
+
+                        </small>
+
+
+                        <p class="mt-2 mb-3">
+
+                            <b>
+
+                                {% if c.fee %}
+                                    ₹{{ c.fee|floatformat:0 }}
+                                {% else %}
+                                    Fee on enquiry
+                                {% endif %}
+
+                            </b>
+
+                        </p>
+
+
+                        <a
+                            class="btn btn-primary w-100"
+                            href="{{ c.get_absolute_url }}"
+                        >
+                            View Details
+                        </a>
+
+                    </div>
+
+                </article>
+
+            </div>
+
+
+            {% empty %}
+
+            <div class="col-12">
+
+                <div class="empty text-center">
+
+                    <i class="bi bi-book fs-1"></i>
+
+                    <h3 class="mt-3">
+                        No Courses Available
+                    </h3>
+
+                    <p class="mb-0">
+                        Courses will be displayed here once they are
+                        added by the administrator.
+                    </p>
+
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+
+        {% if page_obj.paginator.num_pages > 1 %}
+
+        <div class="text-center mt-5">
+
+            <span>
+                Page {{ page_obj.number }}
+                of {{ page_obj.paginator.num_pages }}
+            </span>
+
+
+            {% if page_obj.has_previous %}
+
+                <a
+                    class="btn btn-outline-primary ms-2"
+                    href="?page={{ page_obj.previous_page_number }}"
+                >
+                    Previous
+                </a>
+
+            {% endif %}
+
+
+            {% if page_obj.has_next %}
+
+                <a
+                    class="btn btn-outline-primary ms-2"
+                    href="?page={{ page_obj.next_page_number }}"
+                >
+                    Next
+                </a>
+
+            {% endif %}
+
+        </div>
+
+        {% endif %}
+
+    </div>
+</section>
+
+{% endblock %}

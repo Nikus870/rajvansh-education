@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Franchise | {{ site_settings.website_name }}
+{% endblock %}
+
+{% block content %}
+
+<section class="hero compact">
+    <div class="container">
+
+        <span class="eyebrow">
+            Partner with Rajvans
+        </span>
+
+        <h1>
+            Franchise opportunities for education-focused partners
+        </h1>
+
+        <p>
+            Submit your business details for review.
+            Approval and commercial terms are decided by the client.
+        </p>
+
+        <div class="d-flex flex-wrap gap-2 mt-4">
+
+            <a
+                class="btn btn-primary btn-lg"
+                href="{% url 'franchise:register' %}"
+            >
+                Register Interest
+            </a>
+
+            <a
+                class="btn btn-outline-primary btn-lg"
+                href="{% url 'franchise:login' %}"
+            >
+                Franchise Login
+            </a>
+
+        </div>
+
+    </div>
+</section>
+
+{% endblock %}

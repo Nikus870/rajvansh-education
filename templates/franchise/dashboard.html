@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Franchise Dashboard | {{site_settings.website_name}}{% endblock %}
+{% block content %}
+<section class="pagehero">
+    <div class="container d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <span class="eyebrow">Partner dashboard</span>
+            <h1>Welcome, {{request.user.first_name}}</h1>
+        </div>
+        <div>
+            <form method="post" action="{% url 'franchise:logout' %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger">Log out</button>
+            </form>
+        </div>
+    </div>
+</section>
+<section class="section">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="feature">
+                    <h3>Profile</h3>
+                    <p>{{request.user.email}}</p>
+                    <p>{{profile.mobile}}<br>{{profile.city}}, {{profile.state}}<br>{{profile.business_name}}</p>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="feature">
+                    <h3>Applications</h3>
+                    {% for a in applications %}
+                        <div class="d-flex justify-content-between border-bottom py-3">
+                            <span>{{a.business_name|default:'Franchise application'}}<small class="d-block">{{a.created_at}}</small></span>
+                            <b class="badgex">{{a.get_status_display}}</b>
+                        </div>
+                    {% empty %}
+                        <p>No applications found.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

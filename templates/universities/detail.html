@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {{ university.name }} | {{ site_settings.website_name }}
+{% endblock %}
+
+{% block content %}
+
+<section class="pagehero">
+    <div class="container">
+        <span class="eyebrow">University details</span>
+
+        <h1>{{ university.name }}</h1>
+
+        {% if university.location %}
+            <p>{{ university.location }}</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="section">
+
+    <div class="container">
+
+        <div class="row g-5">
+
+            <div class="col-lg-8">
+
+                {% if university.cover_image %}
+
+                    <div class="university-detail-image">
+                        <img
+                            src="{{ university.cover_image.url }}"
+                            alt="{{ university.name }}"
+                        >
+                    </div>
+
+                {% elif university.logo %}
+
+                    <div class="university-detail-image">
+                        <img
+                            src="{{ university.logo.url }}"
+                            alt="{{ university.name }}"
+                        >
+                    </div>
+
+                {% endif %}
+
+                <div class="rich mt-4">
+                    {{ university.description|linebreaks }}
+                </div>
+
+                {% if university.additional_information %}
+
+                    <div class="rich">
+                        {{ university.additional_information|linebreaks }}
+                    </div>
+
+                {% endif %}
+
+                {% if university.website %}
+
+                    <div class="mt-4">
+                        <a
+                            class="btn btn-outline-primary"
+                            href="{{ university.website }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            Visit official website
+                        </a>
+                    </div>
+
+                {% endif %}
+
+            </div>
+
+            <div class="col-lg-4">
+
+                <div class="stickycard">
+
+                    <h3>Published courses</h3>
+
+                    {% for c in courses %}
+
+                        <a
+                            class="d-block py-2"
+                            href="{{ c.get_absolute_url }}"
+                        >
+                            {{ c.name }}
+                        </a>
+
+                    {% empty %}
+
+                        <p>No published courses are linked yet.</p>
+
+                    {% endfor %}
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+{% endblock %}

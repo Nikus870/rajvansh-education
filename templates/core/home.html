@@ -1,0 +1,247 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {{ site_settings.hero_title }} | {{ site_settings.website_name }}
+{% endblock %}
+
+{% block content %}
+
+<!-- ================= HERO ================= -->
+<section class="hero">
+    <div class="hero-orb hero-orb-one"></div>
+    <div class="hero-orb hero-orb-two"></div>
+    <div class="hero-grid"></div>
+
+    <div class="container position-relative">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-7 hero-copy">
+                <span class="eyebrow hero-eyebrow">Flexible education support</span>
+
+                <h1>{{ site_settings.hero_title }}</h1>
+
+                <p>{{ site_settings.hero_subtitle }}</p>
+
+                <div class="d-flex flex-wrap gap-3 hero-actions">
+                    <a class="btn btn-primary btn-lg" href="{% url 'courses:list' %}">
+                        Explore Courses <i class="bi bi-arrow-right"></i>
+                    </a>
+                    <a class="btn btn-hero-outline btn-lg" href="{% url 'inquiries:consultation' %}">
+                        Career Consultation
+                    </a>
+                    <a class="btn btn-hero-light btn-lg" href="{% url 'inquiries:inquiry' %}">
+                        Enquire Now
+                    </a>
+                </div>
+
+                <div class="admission mt-4">
+                    <span class="admission-dot"></span>
+                    <b>
+                        {% if admission_settings.is_open %}
+                            Admission Open
+                        {% else %}
+                            Admissions Currently Closed
+                        {% endif %}
+                    </b>
+                    <span class="admission-separator">·</span>
+                    {{ admission_settings.admission_message }}
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="hero-visual" data-reveal="right">
+                    <div class="hero-visual-glow"></div>
+                    <div class="hero-image-frame">
+                        <img
+                            src="{% static 'images/hero-education.svg' %}"
+                            alt="Student learning through modern education"
+                            loading="eager"
+                            decoding="async"
+                        >
+                    </div>
+                    <div class="floating-badge floating-badge-top">
+                        <i class="bi bi-mortarboard-fill"></i>
+                        <span><strong>Learn</strong><small>with confidence</small></span>
+                    </div>
+                    <div class="floating-badge floating-badge-bottom">
+                        <i class="bi bi-graph-up-arrow"></i>
+                        <span><strong>Career focused</strong><small>guided pathways</small></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ================= STATISTICS ================= -->
+<section class="stats" data-reveal>
+    <div class="container">
+        <div class="row">
+            {% for s in statistics %}
+                <div class="col-6 col-lg-3 stat-item">
+                    <b data-count="{{ s.value }}">0</b>
+                    <span>{{ s.label }}</span>
+                </div>
+            {% empty %}
+                <div class="col-12">Add approved statistics in Admin.</div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- ================= FEATURED COURSES ================= -->
+<section class="section section-light">
+    <div class="container">
+        <div class="section-head" data-reveal>
+            <div>
+                <span class="eyebrow">Popular pathways</span>
+                <h2>Explore courses that fit your goals</h2>
+            </div>
+            <a href="{% url 'courses:list' %}">View all <i class="bi bi-arrow-up-right"></i></a>
+        </div>
+
+        <div class="row g-4">
+            {% for c in featured_courses %}
+                <div class="col-md-6 col-lg-4" data-reveal>
+                    <article class="cardx h-100">
+                        <div class="course-image">
+                            {% if c.image %}
+                                <img src="{{ c.image.url }}" alt="{{ c.name }}" loading="lazy" decoding="async">
+                            {% else %}
+                                <i class="bi bi-book-half"></i>
+                            {% endif %}
+                            <span>{{ c.category.name }}</span>
+                        </div>
+
+                        <div class="p-4 cardx-body">
+                            <h3>{{ c.name }}</h3>
+                            <p>{{ c.short_description }}</p>
+                            <small>{{ c.duration }} · {{ c.study_mode_label }}</small>
+
+                            <div class="d-flex gap-2 mt-4">
+                                <a class="btn btn-outline-primary flex-fill" href="{{ c.get_absolute_url }}">Details</a>
+                                <a class="btn btn-primary flex-fill" href="{% url 'inquiries:inquiry' %}?course={{ c.pk }}">Enquire</a>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            {% empty %}
+                <div class="col-12"><div class="empty">No public courses yet. Add approved data in Admin.</div></div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- ================= STUDY OPTIONS ================= -->
+<section class="section section-soft">
+    <div class="container">
+        <div class="section-head" data-reveal>
+            <div>
+                <span class="eyebrow">Study options</span>
+                <h2>Regular and ODL pathways</h2>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            {% for mode in study_modes %}
+                <div class="col-md-6" data-reveal>
+                    <div class="feature">
+                        <span class="feature-icon"><i class="bi {{ mode.icon }}"></i></span>
+                        <h3>{{ mode.title }}</h3>
+                        <p>{{ mode.description }}</p>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="col-12"><div class="empty">Add Regular/ODL content in Admin → Study Mode Info.</div></div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- ================= UNIVERSITIES ================= -->
+<section class="section section-dark university-section">
+    <div class="container">
+        <div class="section-head section-head-dark" data-reveal>
+            <div>
+                <span class="eyebrow">University information</span>
+                <h2>Associated Universities</h2>
+            </div>
+            <a href="{% url 'universities:list' %}">View all <i class="bi bi-arrow-up-right"></i></a>
+        </div>
+
+        <div class="row g-3">
+            {% for u in universities %}
+                <div class="col-6 col-lg-2" data-reveal>
+                    <a class="uni" href="{{ u.get_absolute_url }}">
+                        <span>{{ u.name|slice:':2'|upper }}</span>
+                        <b>{{ u.name }}</b>
+                        <small>{{ u.location }}</small>
+                    </a>
+                </div>
+            {% empty %}
+                <div class="col-12"><div class="empty empty-dark">Add verified university affiliations through Admin.</div></div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- ================= FAQ ================= -->
+<section class="section faq-section section-light" id="faq">
+    <div class="container">
+        <div class="section-head" data-reveal>
+            <div>
+                <span class="eyebrow">Frequently Asked Questions</span>
+                <h2>Have questions? We have answers.</h2>
+                <p class="mb-0">Find quick answers about courses, admissions, universities and education guidance.</p>
+            </div>
+            <a href="{% url 'core:faq' %}">View all FAQs <i class="bi bi-arrow-up-right"></i></a>
+        </div>
+
+        {% if faqs %}
+            <div class="accordion faq-accordion" id="homeFaqAccordion" data-reveal>
+                {% for item in faqs %}
+                    <div class="accordion-item faq-item">
+                        <h3 class="accordion-header" id="faqHeading{{ forloop.counter }}">
+                            <button
+                                class="accordion-button {% if not forloop.first %}collapsed{% endif %}"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#faqCollapse{{ forloop.counter }}"
+                                aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                                aria-controls="faqCollapse{{ forloop.counter }}"
+                            >
+                                <span class="faq-question">{{ item.question }}</span>
+                            </button>
+                        </h3>
+                        <div
+                            id="faqCollapse{{ forloop.counter }}"
+                            class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                            aria-labelledby="faqHeading{{ forloop.counter }}"
+                            data-bs-parent="#homeFaqAccordion"
+                        >
+                            <div class="accordion-body">{{ item.answer|linebreaksbr }}</div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty">No FAQs have been published yet.</div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- ================= CTA ================= -->
+<section class="cta">
+    <div class="container" data-reveal>
+        <div>
+            <span class="eyebrow">Not sure where to start?</span>
+            <h2>Get guidance for your next education decision.</h2>
+            <p>Compare your options with practical, student-focused guidance.</p>
+        </div>
+        <a class="btn btn-light btn-lg" href="{% url 'inquiries:consultation' %}">
+            Find the right course <i class="bi bi-arrow-right"></i>
+        </a>
+    </div>
+</section>
+
+{% endblock %}

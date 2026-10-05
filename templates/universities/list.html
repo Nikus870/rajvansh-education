@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    Universities | {{ site_settings.website_name }}
+{% endblock %}
+
+{% block content %}
+
+<section class="pagehero">
+    <div class="container">
+        <span class="eyebrow">University information</span>
+        <h1>Associated Universities</h1>
+        <p>Only published records entered by the administrator appear here.</p>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+
+        <div class="row g-4">
+
+            {% for u in universities %}
+
+            <div class="col-md-6 col-lg-4">
+
+                <a class="university" href="{{ u.get_absolute_url }}">
+
+                    <div class="unicover">
+
+                        {% if u.cover_image %}
+                            <img
+                                src="{{ u.cover_image.url }}"
+                                alt="{{ u.name }}"
+                                loading="lazy"
+                            >
+                        {% elif u.logo %}
+                            <img
+                                src="{{ u.logo.url }}"
+                                alt="{{ u.name }}"
+                                loading="lazy"
+                            >
+                        {% else %}
+                            <span>{{ u.name|slice:':2'|upper }}</span>
+                        {% endif %}
+
+                    </div>
+
+                    <div class="p-4">
+
+                        <h3>{{ u.name }}</h3>
+
+                        {% if u.location %}
+                            <small>{{ u.location }}</small>
+                        {% endif %}
+
+                        <p>
+                            {{ u.description|truncatewords:25 }}
+                        </p>
+
+                    </div>
+
+                </a>
+
+            </div>
+
+            {% empty %}
+
+            <div class="col-12">
+                <div class="empty">
+                    No university affiliations have been published.
+                </div>
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    </div>
+</section>
+
+{% endblock %}

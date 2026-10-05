@@ -1,0 +1,4 @@
+from django.db import migrations,models
+class Migration(migrations.Migration):
+ initial=True; dependencies=[]
+ operations=[migrations.CreateModel(name="University",fields=[("id",models.BigAutoField(auto_created=True,primary_key=True,serialize=False,verbose_name="ID")),("name",models.CharField(max_length=180)),("slug",models.SlugField(unique=True)),("logo",models.ImageField(blank=True,null=True,upload_to="universities/logos/")),("cover_image",models.ImageField(blank=True,null=True,upload_to="universities/covers/")),("description",models.TextField()),("website",models.URLField(blank=True)),("location",models.CharField(blank=True,max_length=180)),("additional_information",models.TextField(blank=True)),("active",models.BooleanField(default=True)),("created_at",models.DateTimeField(auto_now_add=True)),("updated_at",models.DateTimeField(auto_now=True))],options={"ordering":["name"]})]
