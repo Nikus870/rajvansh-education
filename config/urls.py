@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
 from django.urls import include, path, re_path
@@ -34,13 +35,13 @@ urlpatterns = [
 ]
 
 
-# Serve uploaded media files on Render/production.
+# Temporary media serving for the Render demo
 urlpatterns += [
     re_path(
         r"^media/(?P<path>.*)$",
         serve,
         {
-            "document_root": "media",
+            "document_root": settings.MEDIA_ROOT,
         },
     ),
 ]
