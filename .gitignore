@@ -11,3 +11,4 @@ staticfiles/
 *.log
 db.sqlite3
 *.sqlite3.backup
+data.json
