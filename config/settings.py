@@ -2,6 +2,8 @@ import json
 import os
 import sys
 from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlparse
+
 from django.core.exceptions import ImproperlyConfigured
 
 
@@ -23,16 +25,11 @@ if env_file.is_file():
         for line in f:
             line = line.strip()
 
-            if (
-                line
-                and not line.startswith("#")
-                and "=" in line
-            ):
-                k, v = line.split("=", 1)
-
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
                 os.environ.setdefault(
-                    k.strip(),
-                    v.strip().strip("'\"")
+                    key.strip(),
+                    value.strip().strip("'\""),
                 )
 
 
@@ -41,10 +38,7 @@ if env_file.is_file():
 # =========================================================
 
 def boolean(name, default=False):
-    return os.getenv(
-        name,
-        str(default)
-    ).lower() in {
+    return os.getenv(name, str(default)).lower() in {
         "1",
         "true",
         "yes",
@@ -54,9 +48,9 @@ def boolean(name, default=False):
 
 def listenv(name, default=""):
     return [
-        x.strip()
-        for x in os.getenv(name, default).split(",")
-        if x.strip()
+        item.strip()
+        for item in os.getenv(name, default).split(",")
+        if item.strip()
     ]
 
 
@@ -83,21 +77,17 @@ DEBUG = boolean("DEBUG", TESTING)
 
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
-    "dev-only-change-this"
+    "dev-only-change-this",
 )
 
-
-# Do not allow an insecure SECRET_KEY in production
 if not DEBUG and not TESTING:
-
     if not SECRET_KEY or SECRET_KEY in {
         "dev-only-change-this",
         "change-me-in-production",
     }:
-
         raise ImproperlyConfigured(
-            "SECRET_KEY must be set to a secure, "
-            "unique value when DEBUG is False in production."
+            "SECRET_KEY must be set to a secure, unique value "
+            "when DEBUG is False in production."
         )
 
 
@@ -107,7 +97,7 @@ if not DEBUG and not TESTING:
 
 ALLOWED_HOSTS = listenv(
     "ALLOWED_HOSTS",
-    "127.0.0.1,localhost"
+    "127.0.0.1,localhost",
 )
 
 if not DEBUG and not TESTING and not os.getenv("ALLOWED_HOSTS"):
@@ -120,9 +110,7 @@ if not DEBUG and not TESTING and not os.getenv("ALLOWED_HOSTS"):
 # CSRF TRUSTED ORIGINS
 # =========================================================
 
-CSRF_TRUSTED_ORIGINS = listenv(
-    "CSRF_TRUSTED_ORIGINS"
-)
+CSRF_TRUSTED_ORIGINS = listenv("CSRF_TRUSTED_ORIGINS")
 
 
 # =========================================================
@@ -130,7 +118,6 @@ CSRF_TRUSTED_ORIGINS = listenv(
 # =========================================================
 
 INSTALLED_APPS = [
-
     "apps.core.admin_config.SuperuserOnlyAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -138,7 +125,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    # Project Apps
+    # Project applications
     "apps.core",
     "apps.courses",
     "apps.universities",
@@ -149,15 +136,12 @@ INSTALLED_APPS = [
 ]
 
 
-
 # =========================================================
 # AUTHENTICATION
 # =========================================================
 
 AUTHENTICATION_BACKENDS = [
-
     "apps.franchise.backends.EmailOrUsernameBackend",
-
     "django.contrib.auth.backends.ModelBackend",
 ]
 
@@ -167,21 +151,13 @@ AUTHENTICATION_BACKENDS = [
 # =========================================================
 
 MIDDLEWARE = [
-
     "django.middleware.security.SecurityMiddleware",
-
     "whitenoise.middleware.WhiteNoiseMiddleware",
-
     "django.contrib.sessions.middleware.SessionMiddleware",
-
     "django.middleware.common.CommonMiddleware",
-
     "django.middleware.csrf.CsrfViewMiddleware",
-
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-
     "django.contrib.messages.middleware.MessageMiddleware",
-
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -198,27 +174,17 @@ ROOT_URLCONF = "config.urls"
 # =========================================================
 
 TEMPLATES = [
-
     {
-        "BACKEND":
-            "django.template.backends.django.DjangoTemplates",
-
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [
-            BASE_DIR / "templates"
+            BASE_DIR / "templates",
         ],
-
         "APP_DIRS": True,
-
         "OPTIONS": {
-
             "context_processors": [
-
                 "django.template.context_processors.request",
-
                 "django.contrib.auth.context_processors.auth",
-
                 "django.contrib.messages.context_processors.messages",
-
                 "apps.core.context_processors.site_context",
             ],
         },
@@ -237,10 +203,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 # DATABASE
 # =========================================================
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    ""
-)
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
 if not DEBUG and not TESTING and not DATABASE_URL:
     raise ImproperlyConfigured(
@@ -248,59 +211,49 @@ if not DEBUG and not TESTING and not DATABASE_URL:
     )
 
 if DATABASE_URL.startswith(("postgres://", "postgresql://")):
+    parsed_database_url = urlparse(DATABASE_URL)
 
-    from urllib.parse import parse_qs, unquote, urlparse
-    u = urlparse(DATABASE_URL)
-    if not u.hostname or not u.path.strip("/"):
-        raise ImproperlyConfigured("DATABASE_URL must include a host and database name.")
-    database_options = parse_qs(u.query)
+    if (
+        not parsed_database_url.hostname
+        or not parsed_database_url.path.strip("/")
+    ):
+        raise ImproperlyConfigured(
+            "DATABASE_URL must include a host and database name."
+        )
+
+    database_options = parse_qs(parsed_database_url.query)
 
     DATABASES = {
-
         "default": {
-
-            "ENGINE":
-                "django.db.backends.postgresql",
-
-            "NAME":
-                unquote(u.path.lstrip("/")),
-
-            "USER":
-                unquote(u.username or ""),
-
-            "PASSWORD":
-                unquote(u.password or ""),
-
-            "HOST":
-                u.hostname,
-
-            "PORT":
-                u.port or 5432,
-
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": unquote(parsed_database_url.path.lstrip("/")),
+            "USER": unquote(parsed_database_url.username or ""),
+            "PASSWORD": unquote(parsed_database_url.password or ""),
+            "HOST": parsed_database_url.hostname,
+            "PORT": parsed_database_url.port or 5432,
             "OPTIONS": {
                 key: values[-1]
                 for key, values in database_options.items()
-                if key in {"sslmode", "connect_timeout", "application_name"}
+                if key in {
+                    "sslmode",
+                    "connect_timeout",
+                    "application_name",
+                }
             },
         }
     }
 
 elif DATABASE_URL:
     raise ImproperlyConfigured(
-        "DATABASE_URL must use the PostgreSQL postgres:// or postgresql:// scheme."
+        "DATABASE_URL must use the PostgreSQL postgres:// "
+        "or postgresql:// scheme."
     )
 
 else:
-
     DATABASES = {
-
         "default": {
-
-            "ENGINE":
-                "django.db.backends.sqlite3",
-
-            "NAME":
-                BASE_DIR / "db.sqlite3",
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
         }
     }
 
@@ -310,25 +263,29 @@ else:
 # =========================================================
 
 AUTH_PASSWORD_VALIDATORS = [
-
     {
-        "NAME":
-            "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "UserAttributeSimilarityValidator"
+        ),
     },
-
     {
-        "NAME":
-            "django.contrib.auth.password_validation.MinimumLengthValidator"
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "MinimumLengthValidator"
+        ),
     },
-
     {
-        "NAME":
-            "django.contrib.auth.password_validation.CommonPasswordValidator"
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "CommonPasswordValidator"
+        ),
     },
-
     {
-        "NAME":
-            "django.contrib.auth.password_validation.NumericPasswordValidator"
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "NumericPasswordValidator"
+        ),
     },
 ]
 
@@ -340,11 +297,9 @@ PASSWORD_RESET_TIMEOUT = 60 * 60
 # =========================================================
 
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "Asia/Kolkata"
 
 USE_I18N = True
-
 USE_TZ = True
 
 
@@ -355,7 +310,7 @@ USE_TZ = True
 STATIC_URL = "/static/"
 
 STATICFILES_DIRS = [
-    BASE_DIR / "static"
+    BASE_DIR / "static",
 ]
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -368,40 +323,65 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 
 MEDIA_ROOT_ENV = os.getenv("MEDIA_ROOT", "").strip()
-MEDIA_ROOT = Path(MEDIA_ROOT_ENV) if MEDIA_ROOT_ENV else BASE_DIR / "media"
+
+if DEBUG or TESTING:
+    # Preserve existing local development behavior.
+    MEDIA_ROOT = (
+        Path(MEDIA_ROOT_ENV)
+        if MEDIA_ROOT_ENV
+        else BASE_DIR / "media"
+    )
+else:
+    # Render Free has no persistent local disk by default.
+    # This directory is temporary and is NOT durable storage.
+    MEDIA_ROOT = (
+        Path(MEDIA_ROOT_ENV)
+        if MEDIA_ROOT_ENV
+        else Path("/tmp/rajvans-media")
+    )
+
+    if not MEDIA_ROOT.is_absolute():
+        raise ImproperlyConfigured(
+            "MEDIA_ROOT must be an absolute directory path."
+        )
+
 MEDIA_STORAGE_BACKEND = os.getenv(
     "MEDIA_STORAGE_BACKEND",
     "django.core.files.storage.FileSystemStorage",
 )
+
 try:
-    MEDIA_STORAGE_OPTIONS = json.loads(os.getenv("MEDIA_STORAGE_OPTIONS", "{}"))
+    MEDIA_STORAGE_OPTIONS = json.loads(
+        os.getenv("MEDIA_STORAGE_OPTIONS", "{}")
+    )
 except json.JSONDecodeError as exc:
     raise ImproperlyConfigured(
         "MEDIA_STORAGE_OPTIONS must be valid JSON."
     ) from exc
+
 if not isinstance(MEDIA_STORAGE_OPTIONS, dict):
-    raise ImproperlyConfigured("MEDIA_STORAGE_OPTIONS must be a JSON object.")
+    raise ImproperlyConfigured(
+        "MEDIA_STORAGE_OPTIONS must be a JSON object."
+    )
 
-if not DEBUG and not TESTING:
-    if MEDIA_STORAGE_BACKEND == "django.core.files.storage.FileSystemStorage":
-        if not MEDIA_ROOT_ENV or not MEDIA_ROOT.is_absolute():
+if (
+    not DEBUG
+    and not TESTING
+    and MEDIA_STORAGE_BACKEND
+    == "django.core.files.storage.FileSystemStorage"
+):
+    storage_location = MEDIA_STORAGE_OPTIONS.get("location")
+
+    if storage_location is not None:
+        if (
+            not isinstance(storage_location, str)
+            or Path(storage_location).resolve()
+            != MEDIA_ROOT.resolve()
+        ):
             raise ImproperlyConfigured(
-                "For production FileSystemStorage, explicitly set MEDIA_ROOT to "
-                "an absolute directory. On Render Free, /tmp/rajvans-media is "
-                "available but ephemeral; use a mounted persistent disk if uploads "
-                "must survive restarts and redeploys."
+                "MEDIA_STORAGE_OPTIONS.location must match MEDIA_ROOT "
+                "when using FileSystemStorage."
             )
-
-        storage_location = MEDIA_STORAGE_OPTIONS.get("location")
-        if storage_location is not None:
-            if (
-                not isinstance(storage_location, str)
-                or Path(storage_location).resolve() != MEDIA_ROOT.resolve()
-            ):
-                raise ImproperlyConfigured(
-                    "MEDIA_STORAGE_OPTIONS.location must match MEDIA_ROOT when "
-                    "using production FileSystemStorage."
-                )
 
 
 # =========================================================
@@ -409,16 +389,14 @@ if not DEBUG and not TESTING:
 # =========================================================
 
 STORAGES = {
-
     "default": {
-        "BACKEND":
-            MEDIA_STORAGE_BACKEND,
+        "BACKEND": MEDIA_STORAGE_BACKEND,
         "OPTIONS": MEDIA_STORAGE_OPTIONS,
     },
-
     "staticfiles": {
-        "BACKEND":
+        "BACKEND": (
             "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        ),
     },
 }
 
@@ -427,9 +405,7 @@ STORAGES = {
 # DEFAULT PRIMARY KEY
 # =========================================================
 
-DEFAULT_AUTO_FIELD = (
-    "django.db.models.BigAutoField"
-)
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 # =========================================================
@@ -437,9 +413,7 @@ DEFAULT_AUTO_FIELD = (
 # =========================================================
 
 LOGIN_URL = "franchise:login"
-
 LOGIN_REDIRECT_URL = "franchise:dashboard"
-
 LOGOUT_REDIRECT_URL = "core:home"
 
 
@@ -448,10 +422,7 @@ LOGOUT_REDIRECT_URL = "core:home"
 # =========================================================
 
 MAX_UPLOAD_SIZE_MB = int(
-    os.getenv(
-        "MAX_UPLOAD_SIZE_MB",
-        "5"
-    )
+    os.getenv("MAX_UPLOAD_SIZE_MB", "5")
 )
 
 
@@ -461,41 +432,36 @@ MAX_UPLOAD_SIZE_MB = int(
 
 SECURE_SSL_REDIRECT = boolean(
     "SECURE_SSL_REDIRECT",
-    not DEBUG
+    not DEBUG,
 )
 
 SESSION_COOKIE_SECURE = boolean(
     "SESSION_COOKIE_SECURE",
-    not DEBUG
+    not DEBUG,
 )
 
 CSRF_COOKIE_SECURE = boolean(
     "CSRF_COOKIE_SECURE",
-    not DEBUG
+    not DEBUG,
 )
+
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
+
 if boolean("USE_X_FORWARDED_PROTO", False):
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_PROXY_SSL_HEADER = (
+        "HTTP_X_FORWARDED_PROTO",
+        "https",
+    )
 
 
 # =========================================================
 # HSTS
 # =========================================================
 
-SECURE_HSTS_SECONDS = (
-    31536000
-    if not DEBUG
-    else 0
-)
-
-SECURE_HSTS_INCLUDE_SUBDOMAINS = (
-    not DEBUG
-)
-
-SECURE_HSTS_PRELOAD = (
-    not DEBUG
-)
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
 
 
 # =========================================================
@@ -504,7 +470,6 @@ SECURE_HSTS_PRELOAD = (
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
-
 X_FRAME_OPTIONS = "DENY"
 
 
@@ -520,30 +485,41 @@ EMAIL_BACKEND = os.getenv(
         else "django.core.mail.backends.smtp.EmailBackend"
     ),
 )
+
 EMAIL_HOST = os.getenv("EMAIL_HOST", "")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+
 EMAIL_USE_TLS = boolean("EMAIL_USE_TLS", not DEBUG)
 EMAIL_USE_SSL = boolean("EMAIL_USE_SSL", False)
 
 DEFAULT_FROM_EMAIL = os.getenv(
     "DEFAULT_FROM_EMAIL",
-    "no-reply@example.invalid"
+    "no-reply@example.invalid",
 )
 
 if not DEBUG and not TESTING:
     if EMAIL_BACKEND.endswith("console.EmailBackend"):
         raise ImproperlyConfigured(
-            "A non-console EMAIL_BACKEND must be configured when DEBUG is False."
+            "A non-console EMAIL_BACKEND must be configured "
+            "when DEBUG is False."
         )
-    if EMAIL_BACKEND.endswith("smtp.EmailBackend") and not EMAIL_HOST:
+
+    if (
+        EMAIL_BACKEND.endswith("smtp.EmailBackend")
+        and not EMAIL_HOST
+    ):
         raise ImproperlyConfigured(
             "EMAIL_HOST must be configured for the production SMTP backend."
         )
+
     if DEFAULT_FROM_EMAIL.endswith("@example.invalid"):
         raise ImproperlyConfigured(
-            "DEFAULT_FROM_EMAIL must be configured with a verified sender address."
+            "DEFAULT_FROM_EMAIL must be configured with a verified sender."
         )
+
 if EMAIL_USE_TLS and EMAIL_USE_SSL:
-    raise ImproperlyConfigured("EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be enabled.")
+    raise ImproperlyConfigured(
+        "EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be enabled."
+    )
