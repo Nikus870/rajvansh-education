@@ -386,8 +386,10 @@ if not DEBUG and not TESTING:
     if MEDIA_STORAGE_BACKEND == "django.core.files.storage.FileSystemStorage":
         if not MEDIA_ROOT_ENV or not MEDIA_ROOT.is_absolute():
             raise ImproperlyConfigured(
-                "For production FileSystemStorage, set MEDIA_ROOT to the absolute "
-                "mount path of a durable persistent disk, such as /var/data."
+                "For production FileSystemStorage, explicitly set MEDIA_ROOT to "
+                "an absolute directory. On Render Free, /tmp/rajvans-media is "
+                "available but ephemeral; use a mounted persistent disk if uploads "
+                "must survive restarts and redeploys."
             )
 
         storage_location = MEDIA_STORAGE_OPTIONS.get("location")
