@@ -1,34 +1,21 @@
 # Testing Report
 
-## Tests actually executed in this build environment
+## Verification completed
 
-- Python source compilation with `python -m compileall -q .` — **PASS**
-- Required project files/directories check — **PASS**
-- Django route-name/static reference inspection — **PASS for declared internal names after namespace-aware inspection**
-- Migration Python syntax compilation — **PASS**
-- Security/configuration source inspection — **PASS** for environment-driven secret, DEBUG, ALLOWED_HOSTS, CSRF, secure-cookie and upload-limit configuration
+- `.\.venv\Scripts\python.exe manage.py test` — **PASS**, all 45 tests passed, including franchise login navigation, authenticated-superuser behavior, role-safe `next` redirects, admin approval, account activation, superuser-only Admin access, inactive accounts, and owner/staff tenant isolation. Django created and destroyed an isolated test database; the configured application database was not used.
+- `.\.venv\Scripts\python.exe manage.py check` — **PASS**, no issues reported.
+- `.\.venv\Scripts\python.exe manage.py makemigrations --check` — **PASS**, no changes detected.
+- `git diff --check` — **PASS**, no whitespace errors.
 
-## Tests not executed here
+The test runner applied the project migrations to its temporary test database. No migration was created or applied to the existing application database during this work.
 
-The execution environment does not contain Django, and outbound package installation is unavailable. Therefore the following could **not** honestly be run here:
+## Production verification still required
 
-- `python manage.py check`
-- `python manage.py migrate`
-- `python manage.py test tests`
-- live Django development server
-- live Django Admin
-- browser-based desktop/tablet/mobile visual inspection
-- live PostgreSQL connection
+Production readiness depends on client/hosting configuration and cannot be verified locally without the corresponding services and approved content:
 
-The project includes migrations and an automated Django smoke-test suite so these can be run immediately after installing the requirements on a normal development machine.
-
-## Recommended first verification after extraction
-
-```powershell
-.\\.venv\\Scripts\\Activate.ps1
-pip install -r requirements.txt
-python manage.py check
-python manage.py migrate
-python manage.py test tests
-python manage.py runserver
-```
+- Set production `SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS`, and `CSRF_TRUSTED_ORIGINS`.
+- Provision and test PostgreSQL, SMTP delivery, durable media storage, HTTPS/reverse-proxy settings, and backups.
+- Run deployment migrations and `collectstatic` in the intended hosting environment.
+- Verify production email delivery and account-activation/password-reset links.
+- Review client-approved contact details, affiliations, fees, testimonials, legal text, and existing uploaded media.
+- Perform browser-based visual checks at desktop, tablet, and mobile sizes.

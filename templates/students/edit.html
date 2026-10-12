@@ -1,0 +1,191 @@
+{% extends 'franchise/portal_base.html' %}
+
+{% block title %}Edit Student: {{ student.full_name }}{% endblock %}
+{% block nav_students %}active{% endblock %}
+{% block nav_staff_students %}active{% endblock %}
+{% block breadcrumb %}
+    <span class="separator">/</span>
+    <a href="{% url 'students:list' %}">Students</a>
+    <span class="separator">/</span>
+    <a href="{% url 'students:detail' student.pk %}">{{ student.registration_number }}</a>
+    <span class="separator">/</span> Edit
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div>
+                <h4 class="mb-1 fw-700" style="color:#0b2450;">Edit Student Information</h4>
+                <p class="text-muted mb-0 small">Updating records for <code>{{ student.registration_number }}</code> ({{ student.full_name }})</p>
+            </div>
+            <a href="{% url 'students:detail' student.pk %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Cancel & View
+            </a>
+        </div>
+
+        <div class="portal-form-card">
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger portal-alert mb-4">
+                        {% for err in form.non_field_errors %}
+                            <div>{{ err }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <!-- Section 1: Personal Details -->
+                <h6 class="fw-700 mb-3 pb-2 border-bottom" style="color:#0b2450;">
+                    <i class="bi bi-person me-2 text-primary"></i>Personal Information
+                </h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-600">Full Name <span class="text-danger">*</span></label>
+                        {{ form.full_name }}
+                        {% if form.full_name.errors %}
+                            <div class="text-danger small mt-1">{{ form.full_name.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-600">Father / Guardian Name</label>
+                        {{ form.guardian_name }}
+                        {% if form.guardian_name.errors %}
+                            <div class="text-danger small mt-1">{{ form.guardian_name.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-600">Mobile Number <span class="text-danger">*</span></label>
+                        {{ form.mobile }}
+                        {% if form.mobile.errors %}
+                            <div class="text-danger small mt-1">{{ form.mobile.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-600">Email Address</label>
+                        {{ form.email }}
+                        {% if form.email.errors %}
+                            <div class="text-danger small mt-1">{{ form.email.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-600">Date of Birth</label>
+                        {{ form.date_of_birth }}
+                        {% if form.date_of_birth.errors %}
+                            <div class="text-danger small mt-1">{{ form.date_of_birth.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-600">Gender</label>
+                        {{ form.gender }}
+                        {% if form.gender.errors %}
+                            <div class="text-danger small mt-1">{{ form.gender.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-600">Residential Address</label>
+                        {{ form.address }}
+                        {% if form.address.errors %}
+                            <div class="text-danger small mt-1">{{ form.address.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Section 2: Academic & Admission Details -->
+                <h6 class="fw-700 mb-3 pb-2 border-bottom" style="color:#0b2450;">
+                    <i class="bi bi-mortarboard me-2 text-primary"></i>Academic & Admission
+                </h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-600">Course <span class="text-danger">*</span></label>
+                        {{ form.course }}
+                        {% if form.course.errors %}
+                            <div class="text-danger small mt-1">{{ form.course.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-600">University / Board <span class="text-danger">*</span></label>
+                        {{ form.university }}
+                        {% if form.university.errors %}
+                            <div class="text-danger small mt-1">{{ form.university.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-600">Study Mode <span class="text-danger">*</span></label>
+                        {{ form.study_mode }}
+                        {% if form.study_mode.errors %}
+                            <div class="text-danger small mt-1">{{ form.study_mode.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-600">Previous Qualification</label>
+                        {{ form.previous_qualification }}
+                        {% if form.previous_qualification.errors %}
+                            <div class="text-danger small mt-1">{{ form.previous_qualification.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-600">Admission Date</label>
+                        {{ form.admission_date }}
+                        {% if form.admission_date.errors %}
+                            <div class="text-danger small mt-1">{{ form.admission_date.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Section 3: Status & Remarks -->
+                <h6 class="fw-700 mb-3 pb-2 border-bottom" style="color:#0b2450;">
+                    <i class="bi bi-info-circle me-2 text-primary"></i>Status & Fee Details
+                </h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-600">Admission Status <span class="text-danger">*</span></label>
+                        {{ form.admission_status }}
+                        {% if form.admission_status.errors %}
+                            <div class="text-danger small mt-1">{{ form.admission_status.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-600">Fee Status <span class="text-danger">*</span></label>
+                        {{ form.fee_status }}
+                        {% if form.fee_status.errors %}
+                            <div class="text-danger small mt-1">{{ form.fee_status.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-600">Remarks / Notes</label>
+                        {{ form.remarks }}
+                        {% if form.remarks.errors %}
+                            <div class="text-danger small mt-1">{{ form.remarks.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="bi bi-save me-1"></i> Save Changes
+                    </button>
+                    <a href="{% url 'students:detail' student.pk %}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.portal-form-card input, .portal-form-card select, .portal-form-card textarea').forEach(el => {
+    if (!el.classList.contains('btn')) {
+        if (el.tagName === 'SELECT') {
+            el.classList.add('form-select');
+        } else {
+            el.classList.add('form-control');
+        }
+    }
+});
+</script>
+{% endblock %}

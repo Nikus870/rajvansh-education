@@ -1,0 +1,103 @@
+{% extends 'franchise/portal_base.html' %}
+
+{% block title %}Staff Management{% endblock %}
+{% block nav_staff %}active{% endblock %}
+{% block breadcrumb %}<span class="separator">/</span> Staff Management{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h4 class="mb-1 fw-700" style="color:#0b2450;">Staff Management</h4>
+        <p class="text-muted mb-0 small">Manage your franchise team members</p>
+    </div>
+    <a href="{% url 'franchise:staff_invite' %}" class="btn btn-primary">
+        <i class="bi bi-person-plus me-1"></i> Invite Staff
+    </a>
+</div>
+
+<div class="portal-card">
+    <div class="portal-card-body p-0">
+        {% if staff %}
+            <div class="table-responsive">
+                <table class="table portal-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Account</th>
+                        <th>Invited</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for member in staff %}
+                    <tr>
+                        <td>
+                            <strong>{{ member.name }}</strong>
+                        </td>
+                        <td>{{ member.email }}</td>
+                        <td>
+                            <span class="badge bg-light text-dark border">
+                                {{ member.get_role_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if member.is_active %}
+                                <span class="badge-status badge-admitted">Active</span>
+                            {% else %}
+                                <span class="badge-status badge-rejected">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if member.user and member.user.is_active %}
+                                <span class="badge-status badge-enrolled">Activated</span>
+                            {% else %}
+                                <span class="badge-status badge-pending">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ member.invited_at|date:"M j, Y" }}</small>
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <!-- Toggle active/inactive -->
+                                <form method="post" action="{% url 'franchise:staff_toggle' member.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm {% if member.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                                            title="{% if member.is_active %}Deactivate{% else %}Activate{% endif %}">
+                                        <i class="bi {% if member.is_active %}bi-person-x{% else %}bi-person-check{% endif %}"></i>
+                                    </button>
+                                </form>
+
+                                <!-- Resend invitation (only if account not activated) -->
+                                {% if not member.user or not member.user.is_active %}
+                                    <form method="post" action="{% url 'franchise:staff_resend_invitation' member.pk %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-primary"
+                                                title="Resend invitation">
+                                            <i class="bi bi-envelope-arrow-up"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="bi bi-person-badge text-muted"></i>
+                <p class="fw-500">No staff members yet</p>
+                <p class="small text-muted mb-3">Invite your team to help manage students</p>
+                <a href="{% url 'franchise:staff_invite' %}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-person-plus me-1"></i> Invite First Staff Member
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

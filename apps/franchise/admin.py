@@ -1,3 +1,5 @@
+import logging
+import smtplib
 from secrets import token_urlsafe
 
 from django.conf import settings
@@ -5,12 +7,60 @@ from django.contrib import admin, messages
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import (
     FranchiseActivationToken,
     FranchiseApplication,
     FranchiseProfile,
+    FranchiseStaff,
+    FranchiseStaffInvitation,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _send_activation_email(request, application, *, renew=False):
+    token, _ = FranchiseActivationToken.objects.get_or_create(
+        application=application,
+        defaults={"token": token_urlsafe(48)},
+    )
+    if renew or token.used or token.is_expired:
+        token.token = token_urlsafe(48)
+        token.created_at = timezone.now()
+        token.used = False
+        token.save(update_fields=["token", "created_at", "used"])
+
+    activation_url = request.build_absolute_uri(
+        reverse("franchise:activate", kwargs={"token": token.token})
+    )
+    message = f"""
+Dear {application.name},
+
+Your franchise application with Rajvansh Group of Educations has been approved.
+Please use the link below to activate your account and create your password:
+
+{activation_url}
+
+This link is valid for 24 hours.
+
+Regards,
+Rajvansh Group of Educations
+"""
+    try:
+        return send_mail(
+            subject="Franchise Account Approved - Rajvansh Group of Educations",
+            message=message.strip(),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[application.email],
+            fail_silently=False,
+        ) == 1
+    except (OSError, smtplib.SMTPException):
+        logger.warning(
+            "Activation email delivery failed for application ID %s.",
+            application.pk,
+        )
+        return False
 
 
 @admin.register(FranchiseProfile)
@@ -93,11 +143,34 @@ class FranchiseApplicationAdmin(admin.ModelAdmin):
 
             # Already approved
             if application.status == "approved":
-                self.message_user(
-                    request,
-                    f"{application.email} is already approved.",
-                    level=messages.WARNING,
-                )
+                if not application.user:
+                    self.message_user(
+                        request,
+                        f"{application.email} is approved but has no linked user.",
+                        level=messages.ERROR,
+                    )
+                    continue
+                if application.user.is_active:
+                    self.message_user(
+                        request,
+                        f"{application.email} is already activated.",
+                        level=messages.WARNING,
+                    )
+                    continue
+                if _send_activation_email(request, application, renew=True):
+                    email_count += 1
+                    self.message_user(
+                        request,
+                        f"A fresh activation link was sent to {application.email}.",
+                        level=messages.SUCCESS,
+                    )
+                else:
+                    self.message_user(
+                        request,
+                        f"The activation email to {application.email} could not be sent.",
+                        level=messages.ERROR,
+                    )
+                approved_count += 1
                 continue
 
             # Find existing user by email/username
@@ -110,38 +183,26 @@ class FranchiseApplicationAdmin(admin.ModelAdmin):
                     username__iexact=application.email
                 ).first()
 
-            # Create user if necessary
-            if not user:
-                user = User(
-                    username=application.email,
-                    email=application.email,
-                    first_name=application.name,
-                    is_active=False,
+            # Never attach an existing account to a public franchise
+            # application or replace its credentials.
+            if user:
+                self.message_user(
+                    request,
+                    f"{application.email} already belongs to an account and cannot be approved.",
+                    level=messages.ERROR,
                 )
+                continue
 
-                user.set_unusable_password()
-                user.save()
-
-            else:
-                # Never activate staff/superuser accounts through
-                # the franchise approval system.
-                if user.is_staff or user.is_superuser:
-                    self.message_user(
-                        request,
-                        (
-                            f"{application.email} belongs to a staff "
-                            "or superuser account and cannot be approved "
-                            "as a franchise account."
-                        ),
-                        level=messages.ERROR,
-                    )
-                    continue
-
-                user.email = application.email
-                user.first_name = application.name
-                user.is_active = False
-                user.set_unusable_password()
-                user.save()
+            user = User(
+                username=application.email,
+                email=application.email,
+                first_name=application.name,
+                is_active=False,
+                is_staff=False,
+                is_superuser=False,
+            )
+            user.set_unusable_password()
+            user.save()
 
             # Create/update franchise profile
             FranchiseProfile.objects.update_or_create(
@@ -166,98 +227,20 @@ class FranchiseApplicationAdmin(admin.ModelAdmin):
                 ]
             )
 
-            # Create activation token
-            activation_token, created = (
-                FranchiseActivationToken.objects.get_or_create(
-                    application=application,
-                    defaults={
-                        "token": token_urlsafe(48),
-                    },
-                )
-            )
-
-            # If an old token was already used, create a fresh one
-            if activation_token.used:
-                activation_token.token = token_urlsafe(48)
-                activation_token.used = False
-                activation_token.save(
-                    update_fields=[
-                        "token",
-                        "used",
-                    ]
-                )
-
-            # Build activation URL
-            activation_path = reverse(
-                "franchise:activate",
-                kwargs={
-                    "token": activation_token.token,
-                },
-            )
-
-            activation_url = request.build_absolute_uri(
-                activation_path
-            )
-
-            # Send activation email
-            subject = (
-                "Franchise Account Approved - "
-                "Rajvansh Group of Educations"
-            )
-
-            message = f"""
-Dear {application.name},
-
-Your franchise application with Rajvansh Group of Educations
-has been approved.
-
-Your franchise account has been created successfully.
-
-Please use the following link to activate your account
-and create your password:
-
-{activation_url}
-
-After setting your password, you will be able to log in
-to your franchise dashboard.
-
-If you did not submit this application, please ignore this email.
-
-Regards,
-Rajvansh Group of Educations
-"""
-
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message.strip(),
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[application.email],
-                    fail_silently=False,
-                )
-
+            if _send_activation_email(request, application):
                 email_count += 1
-
-            except Exception as exc:
+            else:
                 self.message_user(
                     request,
-                    (
-                        f"Application for {application.email} was "
-                        f"approved, but the activation email could "
-                        f"not be sent: {exc}"
-                    ),
+                    f"Application for {application.email} was approved, but the activation email could not be sent.",
                     level=messages.ERROR,
                 )
 
             approved_count += 1
 
-            # Also show activation URL to admin for development/testing
             self.message_user(
                 request,
-                (
-                    f"Approved {application.email}. "
-                    f"Activation URL: {activation_url}"
-                ),
+                f"Approved {application.email}.",
                 level=messages.SUCCESS,
             )
 
@@ -266,7 +249,7 @@ Rajvansh Group of Educations
                 request,
                 (
                     f"{approved_count} application(s) approved. "
-                    f"{email_count} activation email(s) generated."
+                    f"{email_count} activation email(s) sent."
                 ),
                 level=messages.INFO,
             )
@@ -284,3 +267,69 @@ Rajvansh Group of Educations
             f"{updated} application(s) rejected.",
             level=messages.WARNING,
         )
+
+
+@admin.register(FranchiseStaff)
+class FranchiseStaffAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "email",
+        "role",
+        "franchise",
+        "is_active",
+        "invited_at",
+    )
+
+    list_filter = (
+        "role",
+        "is_active",
+        "franchise",
+    )
+
+    search_fields = (
+        "name",
+        "email",
+        "franchise__business_name",
+        "franchise__user__email",
+    )
+
+    readonly_fields = ("invited_at", "updated_at")
+
+    actions = ["activate_staff", "deactivate_staff"]
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if obj.user_id and obj.user.is_active != obj.is_active:
+            obj.user.is_active = obj.is_active
+            obj.user.save(update_fields=["is_active"])
+
+    @admin.action(description="Activate selected staff members")
+    def activate_staff(self, request, queryset):
+        updated = queryset.update(is_active=True)
+        # Also activate their user accounts
+        for staff in queryset:
+            if staff.user:
+                staff.user.is_active = True
+                staff.user.save(update_fields=["is_active"])
+        self.message_user(request, f"{updated} staff member(s) activated.")
+
+    @admin.action(description="Deactivate selected staff members")
+    def deactivate_staff(self, request, queryset):
+        updated = queryset.update(is_active=False)
+        for staff in queryset:
+            if staff.user:
+                staff.user.is_active = False
+                staff.user.save(update_fields=["is_active"])
+        self.message_user(
+            request,
+            f"{updated} staff member(s) deactivated.",
+            level=messages.WARNING,
+        )
+
+
+@admin.register(FranchiseStaffInvitation)
+class FranchiseStaffInvitationAdmin(admin.ModelAdmin):
+    list_display = ("staff", "created_at", "used")
+    list_filter = ("used",)
+    readonly_fields = ("staff", "token", "created_at", "used")
+    search_fields = ("staff__email", "staff__name")

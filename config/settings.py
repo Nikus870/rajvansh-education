@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 from pathlib import Path
@@ -60,18 +61,20 @@ def listenv(name, default=""):
 
 
 # =========================================================
+# TESTING
+# =========================================================
+
+TESTING = (
+    "test" in sys.argv
+    or "pytest" in sys.modules
+)
+
+
+# =========================================================
 # DEBUG
 # =========================================================
 
-# Controlled through .env
-#
-# Development:
-# DEBUG=True
-#
-# Production:
-# DEBUG=False
-
-DEBUG = boolean("DEBUG", True)
+DEBUG = boolean("DEBUG", TESTING)
 
 
 # =========================================================
@@ -81,16 +84,6 @@ DEBUG = boolean("DEBUG", True)
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
     "dev-only-change-this"
-)
-
-
-# =========================================================
-# TESTING
-# =========================================================
-
-TESTING = (
-    "test" in sys.argv
-    or "pytest" in sys.modules
 )
 
 
@@ -117,6 +110,11 @@ ALLOWED_HOSTS = listenv(
     "127.0.0.1,localhost"
 )
 
+if not DEBUG and not TESTING and not os.getenv("ALLOWED_HOSTS"):
+    raise ImproperlyConfigured(
+        "ALLOWED_HOSTS must be explicitly configured when DEBUG is False."
+    )
+
 
 # =========================================================
 # CSRF TRUSTED ORIGINS
@@ -133,7 +131,7 @@ CSRF_TRUSTED_ORIGINS = listenv(
 
 INSTALLED_APPS = [
 
-    "django.contrib.admin",
+    "apps.core.admin_config.SuperuserOnlyAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -147,7 +145,9 @@ INSTALLED_APPS = [
     "apps.inquiries",
     "apps.franchise",
     "apps.content",
+    "apps.students",
 ]
+
 
 
 # =========================================================
@@ -242,14 +242,18 @@ DATABASE_URL = os.getenv(
     ""
 )
 
-
-if DATABASE_URL.startswith("postgres"):
-
-    import urllib.parse
-
-    u = urllib.parse.urlparse(
-        DATABASE_URL
+if not DEBUG and not TESTING and not DATABASE_URL:
+    raise ImproperlyConfigured(
+        "DATABASE_URL must point to the production PostgreSQL database."
     )
+
+if DATABASE_URL.startswith(("postgres://", "postgresql://")):
+
+    from urllib.parse import parse_qs, unquote, urlparse
+    u = urlparse(DATABASE_URL)
+    if not u.hostname or not u.path.strip("/"):
+        raise ImproperlyConfigured("DATABASE_URL must include a host and database name.")
+    database_options = parse_qs(u.query)
 
     DATABASES = {
 
@@ -259,21 +263,32 @@ if DATABASE_URL.startswith("postgres"):
                 "django.db.backends.postgresql",
 
             "NAME":
-                u.path.lstrip("/"),
+                unquote(u.path.lstrip("/")),
 
             "USER":
-                u.username,
+                unquote(u.username or ""),
 
             "PASSWORD":
-                u.password,
+                unquote(u.password or ""),
 
             "HOST":
                 u.hostname,
 
             "PORT":
                 u.port or 5432,
+
+            "OPTIONS": {
+                key: values[-1]
+                for key, values in database_options.items()
+                if key in {"sslmode", "connect_timeout", "application_name"}
+            },
         }
     }
+
+elif DATABASE_URL:
+    raise ImproperlyConfigured(
+        "DATABASE_URL must use the PostgreSQL postgres:// or postgresql:// scheme."
+    )
 
 else:
 
@@ -317,6 +332,8 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+PASSWORD_RESET_TIMEOUT = 60 * 60
+
 
 # =========================================================
 # INTERNATIONALIZATION
@@ -351,6 +368,23 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 
 MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_STORAGE_BACKEND = os.getenv(
+    "MEDIA_STORAGE_BACKEND",
+    "django.core.files.storage.FileSystemStorage",
+)
+try:
+    MEDIA_STORAGE_OPTIONS = json.loads(os.getenv("MEDIA_STORAGE_OPTIONS", "{}"))
+except json.JSONDecodeError as exc:
+    raise ImproperlyConfigured(
+        "MEDIA_STORAGE_OPTIONS must be valid JSON."
+    ) from exc
+if not isinstance(MEDIA_STORAGE_OPTIONS, dict):
+    raise ImproperlyConfigured("MEDIA_STORAGE_OPTIONS must be a JSON object.")
+
+if not DEBUG and not TESTING and MEDIA_STORAGE_BACKEND == "django.core.files.storage.FileSystemStorage":
+    raise ImproperlyConfigured(
+        "Configure a durable MEDIA_STORAGE_BACKEND for production media."
+    )
 
 
 # =========================================================
@@ -361,7 +395,8 @@ STORAGES = {
 
     "default": {
         "BACKEND":
-            "django.core.files.storage.FileSystemStorage"
+            MEDIA_STORAGE_BACKEND,
+        "OPTIONS": MEDIA_STORAGE_OPTIONS,
     },
 
     "staticfiles": {
@@ -409,18 +444,22 @@ MAX_UPLOAD_SIZE_MB = int(
 
 SECURE_SSL_REDIRECT = boolean(
     "SECURE_SSL_REDIRECT",
-    False
+    not DEBUG
 )
 
 SESSION_COOKIE_SECURE = boolean(
     "SESSION_COOKIE_SECURE",
-    False
+    not DEBUG
 )
 
 CSRF_COOKIE_SECURE = boolean(
     "CSRF_COOKIE_SECURE",
-    False
+    not DEBUG
 )
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+if boolean("USE_X_FORWARDED_PROTO", False):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
 # =========================================================
@@ -447,6 +486,7 @@ SECURE_HSTS_PRELOAD = (
 # =========================================================
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 X_FRAME_OPTIONS = "DENY"
 
@@ -455,14 +495,38 @@ X_FRAME_OPTIONS = "DENY"
 # EMAIL
 # =========================================================
 
-# Currently using console backend for development.
-# Change this later when real Gmail SMTP is configured.
-
-EMAIL_BACKEND = (
-    "django.core.mail.backends.console.EmailBackend"
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    (
+        "django.core.mail.backends.console.EmailBackend"
+        if DEBUG
+        else "django.core.mail.backends.smtp.EmailBackend"
+    ),
 )
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = boolean("EMAIL_USE_TLS", not DEBUG)
+EMAIL_USE_SSL = boolean("EMAIL_USE_SSL", False)
 
 DEFAULT_FROM_EMAIL = os.getenv(
     "DEFAULT_FROM_EMAIL",
     "no-reply@example.invalid"
 )
+
+if not DEBUG and not TESTING:
+    if EMAIL_BACKEND.endswith("console.EmailBackend"):
+        raise ImproperlyConfigured(
+            "A non-console EMAIL_BACKEND must be configured when DEBUG is False."
+        )
+    if EMAIL_BACKEND.endswith("smtp.EmailBackend") and not EMAIL_HOST:
+        raise ImproperlyConfigured(
+            "EMAIL_HOST must be configured for the production SMTP backend."
+        )
+    if DEFAULT_FROM_EMAIL.endswith("@example.invalid"):
+        raise ImproperlyConfigured(
+            "DEFAULT_FROM_EMAIL must be configured with a verified sender address."
+        )
+if EMAIL_USE_TLS and EMAIL_USE_SSL:
+    raise ImproperlyConfigured("EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be enabled.")

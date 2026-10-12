@@ -1,11 +1,13 @@
-from collections.abc import MutableMapping
+"""
+Franchise portal forms.
+"""
 
 from django import forms
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.db.models import Q
 
-from .models import FranchiseApplication
+from .models import FranchiseApplication, FranchiseStaff
 
 
 class FranchiseRegistrationForm(forms.ModelForm):
@@ -35,8 +37,7 @@ class FranchiseRegistrationForm(forms.ModelForm):
         email = self.cleaned_data["email"].lower().strip()
 
         if User.objects.filter(
-            Q(username__iexact=email) |
-            Q(email__iexact=email)
+            Q(username__iexact=email) | Q(email__iexact=email)
         ).exists():
             raise forms.ValidationError(
                 "An account with this email already exists."
@@ -46,11 +47,7 @@ class FranchiseRegistrationForm(forms.ModelForm):
             FranchiseApplication.objects
             .filter(
                 email__iexact=email,
-                status__in=[
-                    "pending",
-                    "review",
-                    "contacted",
-                ],
+                status__in=["pending", "review", "contacted"],
             )
             .exists()
         )
@@ -66,26 +63,25 @@ class FranchiseRegistrationForm(forms.ModelForm):
 
 class FranchiseLoginForm(forms.Form):
 
-    email = forms.EmailField()
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={"placeholder": "your@email.com"})
+    )
 
     password = forms.CharField(
-        widget=forms.PasswordInput
+        widget=forms.PasswordInput(attrs={"placeholder": "Password"})
     )
 
     def __init__(self, *args, request=None, **kwargs):
         self.request = request
         self.user_cache = None
-
         super().__init__(*args, **kwargs)
 
     def clean(self):
         cleaned_data = super().clean()
-
         email = cleaned_data.get("email")
         password = cleaned_data.get("password")
 
         if email and password:
-
             email = email.strip().lower()
 
             application = (
@@ -96,16 +92,37 @@ class FranchiseLoginForm(forms.Form):
             )
 
             if application:
-
                 if application.status == "rejected":
                     raise forms.ValidationError(
                         "Your franchise application has been rejected."
                     )
-
                 if application.status != "approved":
                     raise forms.ValidationError(
                         "Your franchise application is still "
                         "awaiting admin approval."
+                    )
+
+            user_candidate = User.objects.filter(
+                Q(email__iexact=email) | Q(username__iexact=email)
+            ).order_by("id").first()
+
+            if (
+                user_candidate
+                and user_candidate.check_password(password)
+                and not user_candidate.is_active
+            ):
+                raise forms.ValidationError(
+                    "Your franchise account has not been activated yet."
+                )
+
+            if user_candidate and user_candidate.check_password(password):
+                try:
+                    staff_profile = user_candidate.franchise_staff_profile
+                except FranchiseStaff.DoesNotExist:
+                    staff_profile = None
+                if staff_profile and not staff_profile.is_active:
+                    raise forms.ValidationError(
+                        "Your franchise staff account has been deactivated."
                     )
 
             user = authenticate(
@@ -115,19 +132,31 @@ class FranchiseLoginForm(forms.Form):
             )
 
             if user is None:
-                raise forms.ValidationError(
-                    "Invalid email or password."
-                )
+                raise forms.ValidationError("Invalid email or password.")
 
-            if user.is_staff or user.is_superuser:
+            if user.is_superuser:
                 raise forms.ValidationError(
-                    "Use the Django Admin login for staff accounts."
+                    "Use the Django Admin login for superuser accounts."
+                )
+            if user.is_staff:
+                raise forms.ValidationError(
+                    "This account cannot use the franchise portal."
                 )
 
             if not user.is_active:
                 raise forms.ValidationError(
                     "Your franchise account has not been activated yet."
                 )
+
+            if not hasattr(user, "franchise_profile"):
+                try:
+                    staff_profile = user.franchise_staff_profile
+                except FranchiseStaff.DoesNotExist:
+                    staff_profile = None
+                if staff_profile is None:
+                    raise forms.ValidationError(
+                        "This account is not associated with an active franchise."
+                    )
 
             self.user_cache = user
             cleaned_data["user"] = user
@@ -139,71 +168,125 @@ class FranchiseLoginForm(forms.Form):
 
 
 class FranchiseSetPasswordForm(forms.Form):
+    """Used for both franchise owner activation and staff invitation acceptance."""
 
     password1 = forms.CharField(
         label="New Password",
-        widget=forms.PasswordInput,
+        widget=forms.PasswordInput(attrs={"placeholder": "Choose a strong password"}),
         min_length=8,
     )
 
     password2 = forms.CharField(
         label="Confirm Password",
-        widget=forms.PasswordInput,
+        widget=forms.PasswordInput(attrs={"placeholder": "Repeat your password"}),
         min_length=8,
     )
 
     def clean(self):
         cleaned_data = super().clean()
-
         password1 = cleaned_data.get("password1")
         password2 = cleaned_data.get("password2")
 
         if password1 and password2 and password1 != password2:
-            raise forms.ValidationError(
-                "Passwords do not match."
-            )
+            raise forms.ValidationError("Passwords do not match.")
 
         return cleaned_data
 
 
-class cleaned_data(MutableMapping):
-    """A dict-like container for validated form values."""
+class FranchisePasswordChangeForm(forms.Form):
+    """Form for an authenticated user to change their own password."""
 
-    def __init__(self, *args, **kwargs):
-        self._store = {}
-        self.update(*args, **kwargs)
+    current_password = forms.CharField(
+        label="Current Password",
+        widget=forms.PasswordInput(attrs={"placeholder": "Current password"}),
+    )
 
-    def __getitem__(self, key):
-        return self._store[key]
+    new_password1 = forms.CharField(
+        label="New Password",
+        widget=forms.PasswordInput(attrs={"placeholder": "New password"}),
+        min_length=8,
+    )
 
-    def __setitem__(self, key, value):
-        self._store[str(key)] = value
+    new_password2 = forms.CharField(
+        label="Confirm New Password",
+        widget=forms.PasswordInput(attrs={"placeholder": "Repeat new password"}),
+        min_length=8,
+    )
 
-    def __delitem__(self, key):
-        del self._store[key]
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
 
-    def __iter__(self):
-        return iter(self._store)
+    def clean_current_password(self):
+        current = self.cleaned_data.get("current_password")
+        if self.user and not self.user.check_password(current):
+            raise forms.ValidationError("Your current password is incorrect.")
+        return current
 
-    def __len__(self):
-        return len(self._store)
+    def clean(self):
+        cleaned_data = super().clean()
+        p1 = cleaned_data.get("new_password1")
+        p2 = cleaned_data.get("new_password2")
 
-    def get(self, key, default=None):
-        return self._store.get(key, default)
+        if p1 and p2 and p1 != p2:
+            raise forms.ValidationError("New passwords do not match.")
 
-    def update(self, *args, **kwargs):
-        for mapping in args:
-            if hasattr(mapping, "items"):
-                items = mapping.items()
-            else:
-                items = mapping
-            for key, value in items:
-                self[key] = value
-        for key, value in kwargs.items():
-            self[key] = value
+        return cleaned_data
 
-    def copy(self):
-        return cleaned_data(self._store)
 
-    def as_dict(self):
-        return dict(self._store)
+class FranchiseForgotPasswordForm(forms.Form):
+    """Step 1: Enter email to request a password reset link."""
+
+    email = forms.EmailField(
+        label="Email Address",
+        widget=forms.EmailInput(attrs={"placeholder": "your@email.com"}),
+    )
+
+
+class FranchisePasswordResetForm(forms.Form):
+    """Step 2: Enter and confirm new password after clicking the reset link."""
+
+    password1 = forms.CharField(
+        label="New Password",
+        widget=forms.PasswordInput(attrs={"placeholder": "Choose a strong password"}),
+        min_length=8,
+    )
+
+    password2 = forms.CharField(
+        label="Confirm Password",
+        widget=forms.PasswordInput(attrs={"placeholder": "Repeat your password"}),
+        min_length=8,
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        p1 = cleaned_data.get("password1")
+        p2 = cleaned_data.get("password2")
+
+        if p1 and p2 and p1 != p2:
+            raise forms.ValidationError("Passwords do not match.")
+
+        return cleaned_data
+
+
+class FranchiseStaffInviteForm(forms.Form):
+    """Form used by franchise owners to invite a new staff member."""
+
+    name = forms.CharField(
+        max_length=180,
+        label="Full Name",
+        widget=forms.TextInput(attrs={"placeholder": "Staff member's full name"}),
+    )
+
+    email = forms.EmailField(
+        label="Email Address",
+        widget=forms.EmailInput(attrs={"placeholder": "staff@email.com"}),
+    )
+
+    role = forms.ChoiceField(
+        choices=FranchiseStaff.ROLE_CHOICES,
+        label="Role",
+    )
+
+    def clean_email(self):
+        return self.cleaned_data["email"].lower().strip()

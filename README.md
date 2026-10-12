@@ -18,4 +18,4 @@ Open `/` and `/admin/`. Optional demo data: `python manage.py load_demo_data`. D
 `core` global settings/admission/statistics; `courses` categories/courses/filtering; `universities` affiliations; `inquiries` enquiries/consultations/contact; `franchise` registration/auth/dashboard; `content` FAQs/testimonials/pages.
 
 ## Production
-Use `DEBUG=False`, strong `SECRET_KEY`, correct `ALLOWED_HOSTS`, HTTPS/secure cookies, PostgreSQL through `DATABASE_URL`, `collectstatic`, durable media storage and regular backups.
+Use `DEBUG=False`, strong `SECRET_KEY`, correct `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS`, HTTPS/secure cookies, PostgreSQL through `DATABASE_URL`, a private production email backend, `collectstatic`, durable media storage and regular tested backups. Production configuration fails fast if required secrets, PostgreSQL, email or durable media storage are missing. See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md).

@@ -1,0 +1,85 @@
+{% extends 'franchise/portal_base.html' %}
+
+{% block title %}Invite Staff{% endblock %}
+{% block nav_staff %}active{% endblock %}
+{% block breadcrumb %}
+    <span class="separator">/</span>
+    <a href="{% url 'franchise:staff_list' %}">Staff</a>
+    <span class="separator">/</span> Invite
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <h4 class="mb-4 fw-700" style="color:#0b2450;">Invite Staff Member</h4>
+
+        <div class="portal-form-card">
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label class="form-label fw-600">Full Name <span class="text-danger">*</span></label>
+                    {{ form.name }}
+                    {% if form.name.errors %}
+                        <div class="text-danger small mt-1">{{ form.name.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-600">Email Address <span class="text-danger">*</span></label>
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                        <div class="text-danger small mt-1">{{ form.email.errors.0 }}</div>
+                    {% endif %}
+                    <div class="form-text text-muted">
+                        A time-limited invitation link will be sent to this email.
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-600">Role <span class="text-danger">*</span></label>
+                    {{ form.role }}
+                    {% if form.role.errors %}
+                        <div class="text-danger small mt-1">{{ form.role.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger portal-alert">
+                        {{ form.non_field_errors.0 }}
+                    </div>
+                {% endif %}
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-envelope me-1"></i> Send Invitation
+                    </button>
+                    <a href="{% url 'franchise:staff_list' %}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <div class="alert alert-info portal-alert mt-3 small">
+            <i class="bi bi-info-circle me-1"></i>
+            The invitation link is valid for 24 hours. If delivery fails, check the configured email service before resending.
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Add Bootstrap form-control class to all form inputs
+document.querySelectorAll('.portal-form-card input, .portal-form-card select, .portal-form-card textarea').forEach(el => {
+    if (!el.classList.contains('btn')) {
+        el.classList.add('form-control');
+        if (el.tagName === 'SELECT') {
+            el.classList.add('form-select');
+            el.classList.remove('form-control');
+        }
+    }
+});
+</script>
+{% endblock %}

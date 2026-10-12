@@ -1,0 +1,541 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Franchise Portal{% endblock %} | {{ site_settings.website_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{% static 'css/style.css' %}" rel="stylesheet">
+    <style>
+        :root {
+            --portal-navy: #0b2450;
+            --portal-blue: #1456d9;
+            --portal-sidebar-bg: #06132f;
+            --portal-sidebar-width: 260px;
+            --portal-top-height: 64px;
+            --portal-muted: #8494b0;
+            --portal-border: #1a2e50;
+            --portal-active-bg: rgba(52, 120, 255, 0.15);
+            --portal-active-color: #5c9aff;
+        }
+
+        body {
+            background: #f4f7fc;
+            min-height: 100vh;
+        }
+
+        /* ── Sidebar ─────────────────────────────────────── */
+        .portal-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--portal-sidebar-width);
+            height: 100vh;
+            background: var(--portal-sidebar-bg);
+            z-index: 1040;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+            overflow-y: auto;
+        }
+
+        .portal-sidebar-brand {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--portal-border);
+        }
+
+        .portal-sidebar-brand .brand-mark {
+            background: var(--portal-blue);
+            color: #fff;
+            font-weight: 700;
+            font-size: 0.9rem;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .portal-sidebar-brand .brand-name {
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.95rem;
+            line-height: 1.25;
+        }
+
+        .portal-sidebar-brand .brand-sub {
+            color: var(--portal-muted);
+            font-size: 0.72rem;
+            display: block;
+        }
+
+        .portal-nav {
+            padding: 1rem 0;
+            flex: 1;
+        }
+
+        .portal-nav-section {
+            padding: 0.4rem 1.25rem 0.2rem;
+            color: var(--portal-muted);
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .portal-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.65rem 1.5rem;
+            color: #b8c7dd;
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border-left: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .portal-nav-link:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .portal-nav-link.active {
+            color: var(--portal-active-color);
+            background: var(--portal-active-bg);
+            border-left-color: var(--portal-blue);
+        }
+
+        .portal-nav-link i {
+            font-size: 1.05rem;
+            width: 20px;
+            flex-shrink: 0;
+        }
+
+        .portal-sidebar-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--portal-border);
+        }
+
+        /* ── Top bar ──────────────────────────────────────── */
+        .portal-topbar {
+            position: fixed;
+            top: 0;
+            left: var(--portal-sidebar-width);
+            right: 0;
+            height: var(--portal-top-height);
+            background: #fff;
+            border-bottom: 1px solid #e3eaf4;
+            z-index: 1030;
+            display: flex;
+            align-items: center;
+            padding: 0 1.5rem;
+            gap: 1rem;
+        }
+
+        .portal-topbar-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.4rem;
+            color: #0b2450;
+            padding: 0;
+            cursor: pointer;
+        }
+
+        .portal-breadcrumb {
+            color: #8494b0;
+            font-size: 0.82rem;
+        }
+
+        .portal-breadcrumb a {
+            color: #8494b0;
+            text-decoration: none;
+        }
+
+        .portal-breadcrumb a:hover {
+            color: var(--portal-blue);
+        }
+
+        .portal-breadcrumb .separator {
+            margin: 0 0.4rem;
+        }
+
+        .portal-topbar-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .portal-user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--portal-blue);
+            color: #fff;
+            font-weight: 700;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        /* ── Main content ─────────────────────────────────── */
+        .portal-main {
+            margin-left: var(--portal-sidebar-width);
+            margin-top: var(--portal-top-height);
+            min-height: calc(100vh - var(--portal-top-height));
+            padding: 2rem;
+        }
+
+        /* ── Stat cards ───────────────────────────────────── */
+        .stat-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid #e3eaf4;
+            box-shadow: 0 2px 8px rgba(11, 36, 80, 0.04);
+            height: 100%;
+        }
+
+        .stat-card .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #0b2450;
+            line-height: 1;
+        }
+
+        .stat-card .stat-label {
+            color: #8494b0;
+            font-size: 0.82rem;
+            margin-top: 0.3rem;
+        }
+
+        /* ── Portal card ──────────────────────────────────── */
+        .portal-card {
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #e3eaf4;
+            box-shadow: 0 2px 8px rgba(11, 36, 80, 0.04);
+        }
+
+        .portal-card-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #e3eaf4;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .portal-card-header h5 {
+            margin: 0;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #0b2450;
+        }
+
+        .portal-card-body {
+            padding: 1.25rem 1.5rem;
+        }
+
+        /* ── Badge styles ─────────────────────────────────── */
+        .badge-status {
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.3em 0.65em;
+            border-radius: 6px;
+        }
+
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-admitted, .badge-enrolled { background: #d1e7dd; color: #0f5132; }
+        .badge-rejected, .badge-cancelled { background: #f8d7da; color: #842029; }
+        .badge-paid { background: #d1e7dd; color: #0f5132; }
+        .badge-partial { background: #cff4fc; color: #0c7690; }
+        .badge-waived { background: #e2e3e5; color: #41464b; }
+
+        /* ── Forms ────────────────────────────────────────── */
+        .portal-form-card {
+            background: #fff;
+            border-radius: 14px;
+            border: 1px solid #e3eaf4;
+            padding: 2rem;
+            box-shadow: 0 2px 12px rgba(11, 36, 80, 0.05);
+        }
+
+        /* ── Mobile responsive ────────────────────────────── */
+        .portal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1039;
+        }
+
+        @media (max-width: 991.98px) {
+            .portal-sidebar {
+                transform: translateX(-100%);
+            }
+
+            .portal-sidebar.open {
+                transform: translateX(0);
+            }
+
+            .portal-overlay.open {
+                display: block;
+            }
+
+            .portal-topbar {
+                left: 0;
+            }
+
+            .portal-main {
+                margin-left: 0;
+            }
+
+            .portal-topbar-toggle {
+                display: block;
+            }
+        }
+
+        /* ── Table ────────────────────────────────────────── */
+        .portal-table {
+            font-size: 0.875rem;
+        }
+
+        .portal-table th {
+            font-weight: 600;
+            color: #6c7a94;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 2px solid #e3eaf4;
+            padding: 0.75rem 1rem;
+            white-space: nowrap;
+        }
+
+        .portal-table td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid #f0f4f9;
+            vertical-align: middle;
+            color: #1a2e50;
+        }
+
+        .portal-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* ── Alert override ───────────────────────────────── */
+        .portal-alert {
+            border-radius: 10px;
+            font-size: 0.875rem;
+        }
+
+        /* ── Empty state ─────────────────────────────────── */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #8494b0;
+        }
+
+        .empty-state i {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ======= SIDEBAR OVERLAY (mobile) ======= -->
+<div class="portal-overlay" id="sidebarOverlay"></div>
+
+<!-- ======= SIDEBAR ======= -->
+<aside class="portal-sidebar" id="portalSidebar">
+    <div class="portal-sidebar-brand d-flex align-items-center gap-2">
+        <span class="brand-mark">RG</span>
+        <div>
+            <span class="brand-name">Rajvans Group</span>
+            <span class="brand-sub">Franchise Portal</span>
+        </div>
+    </div>
+
+    <nav class="portal-nav">
+        {% if request.user.is_authenticated and request.user.franchise_profile %}
+            <span class="portal-nav-section">Main</span>
+            <a href="{% url 'franchise:dashboard' %}"
+               class="portal-nav-link {% block nav_dashboard %}{% endblock %}">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </a>
+            <a href="{% url 'students:register' %}"
+               class="portal-nav-link {% block nav_register %}{% endblock %}">
+                <i class="bi bi-person-plus"></i> Register Student
+            </a>
+            <a href="{% url 'students:list' %}"
+               class="portal-nav-link {% block nav_students %}{% endblock %}">
+                <i class="bi bi-people"></i> All Students
+            </a>
+
+            <span class="portal-nav-section mt-2">Management</span>
+            <a href="{% url 'franchise:staff_list' %}"
+               class="portal-nav-link {% block nav_staff %}{% endblock %}">
+                <i class="bi bi-person-badge"></i> Staff Management
+            </a>
+            <a href="{% url 'students:export_csv' %}"
+               class="portal-nav-link">
+                <i class="bi bi-download"></i> Export Students CSV
+            </a>
+
+            <span class="portal-nav-section mt-2">Account</span>
+            <a href="{% url 'franchise:profile' %}"
+               class="portal-nav-link {% block nav_profile %}{% endblock %}">
+                <i class="bi bi-building"></i> Franchise Profile
+            </a>
+            <a href="{% url 'franchise:change_password' %}"
+               class="portal-nav-link {% block nav_password %}{% endblock %}">
+                <i class="bi bi-key"></i> Change Password
+            </a>
+
+        {% elif request.user.is_authenticated and request.user.franchise_staff_profile %}
+            <span class="portal-nav-section">Main</span>
+            <a href="{% url 'franchise:staff_dashboard' %}"
+               class="portal-nav-link {% block nav_staff_dash %}{% endblock %}">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </a>
+            <a href="{% url 'students:register' %}"
+               class="portal-nav-link {% block nav_staff_register %}{% endblock %}">
+                <i class="bi bi-person-plus"></i> Register Student
+            </a>
+            <a href="{% url 'students:list' %}"
+               class="portal-nav-link {% block nav_staff_students %}{% endblock %}">
+                <i class="bi bi-people"></i> Students
+            </a>
+            <span class="portal-nav-section mt-2">Account</span>
+            <a href="{% url 'franchise:change_password' %}"
+               class="portal-nav-link">
+                <i class="bi bi-key"></i> Change Password
+            </a>
+        {% endif %}
+    </nav>
+
+    <div class="portal-sidebar-footer">
+        <form method="post" action="{% url 'franchise:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="portal-nav-link border-0 bg-transparent w-100 text-start">
+                <i class="bi bi-box-arrow-left"></i> Logout
+            </button>
+        </form>
+        <a href="/" class="portal-nav-link mt-1" style="font-size: 0.78rem;">
+            <i class="bi bi-house"></i> Back to Website
+        </a>
+    </div>
+</aside>
+
+<!-- ======= TOP BAR ======= -->
+<header class="portal-topbar">
+    <button class="portal-topbar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+        <i class="bi bi-list"></i>
+    </button>
+
+    <div class="portal-breadcrumb">
+        <a href="{% url 'franchise:dashboard' %}">Portal</a>
+        {% block breadcrumb %}{% endblock %}
+    </div>
+
+    <div class="portal-topbar-right">
+        <div class="dropdown">
+            <div class="portal-user-avatar" data-bs-toggle="dropdown" style="cursor:pointer;">
+                {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
+            </div>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                <li>
+                    <span class="dropdown-item-text small text-muted">
+                        {{ request.user.get_full_name|default:request.user.email }}
+                    </span>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                {% if request.user.franchise_profile %}
+                    <li><a class="dropdown-item" href="{% url 'franchise:profile' %}">
+                        <i class="bi bi-building me-2"></i>Profile
+                    </a></li>
+                {% endif %}
+                <li><a class="dropdown-item" href="{% url 'franchise:change_password' %}">
+                    <i class="bi bi-key me-2"></i>Change Password
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form method="post" action="{% url 'franchise:logout' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item text-danger">
+                            <i class="bi bi-box-arrow-left me-2"></i>Logout
+                        </button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    </div>
+</header>
+
+<!-- ======= MAIN CONTENT ======= -->
+<main class="portal-main">
+
+    <!-- Django messages -->
+    {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'warning' %}alert-warning{% elif message.tags == 'info' %}alert-info{% else %}alert-success{% endif %} alert-dismissible portal-alert fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Sidebar toggle for mobile
+    const sidebar = document.getElementById('portalSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const toggle = document.getElementById('sidebarToggle');
+
+    function openSidebar() {
+        sidebar.classList.add('open');
+        overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeSidebar() {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    toggle.addEventListener('click', () => {
+        sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+    });
+
+    overlay.addEventListener('click', closeSidebar);
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

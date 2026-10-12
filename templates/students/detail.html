@@ -1,0 +1,159 @@
+{% extends 'franchise/portal_base.html' %}
+
+{% block title %}Student Details: {{ student.full_name }}{% endblock %}
+{% block nav_students %}active{% endblock %}
+{% block nav_staff_students %}active{% endblock %}
+{% block breadcrumb %}
+    <span class="separator">/</span>
+    <a href="{% url 'students:list' %}">Students</a>
+    <span class="separator">/</span> {{ student.registration_number }}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+            <div>
+                <span class="badge bg-primary mb-1">{{ student.registration_number }}</span>
+                <h4 class="mb-0 fw-700" style="color:#0b2450;">{{ student.full_name }}</h4>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'students:list' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i> Back to List
+                </a>
+                <a href="{% url 'students:edit' student.pk %}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-pencil me-1"></i> Edit Details
+                </a>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="portal-card h-100">
+                    <div class="portal-card-header">
+                        <h5><i class="bi bi-person me-2 text-primary"></i>Personal Information</h5>
+                    </div>
+                    <div class="portal-card-body">
+                        <table class="table table-sm table-borderless mb-0">
+                            <tr>
+                                <td class="text-muted fw-500" style="width: 40%;">Full Name</td>
+                                <td class="fw-600">{{ student.full_name }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted fw-500">Father/Guardian</td>
+                                <td>{{ student.guardian_name|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted fw-500">Mobile Number</td>
+                                <td>{{ student.mobile }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted fw-500">Email</td>
+                                <td>{{ student.email|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted fw-500">Date of Birth</td>
+                                <td>{{ student.date_of_birth|date:"M j, Y"|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted fw-500">Gender</td>
+                                <td>{{ student.get_gender_display|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted fw-500">Address</td>
+                                <td>{{ student.address|linebreaksbr|default:"—" }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="portal-card h-100">
+                    <div class="portal-card-header">
+                        <h5><i class="bi bi-mortarboard me-2 text-primary"></i>Academic & Admission</h5>
+                    </div>
+                    <div class="portal-card-body">
+                        <table class="table table-sm table-borderless mb-0">
+                            <tr>
+                                <td class="text-muted fw-500" style="width: 40%;">Course</td>
+                                <td class="fw-600">{{ student.course.name }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted fw-500">University</td>
+                                <td>{{ student.university.name }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted fw-500">Study Mode</td>
+                                <td><span class="badge bg-light text-dark border">{{ student.get_study_mode_display }}</span></td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted fw-500">Prev. Qualification</td>
+                                <td>{{ student.get_previous_qualification_display|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted fw-500">Admission Date</td>
+                                <td>{{ student.admission_date|date:"M j, Y"|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted fw-500">Admission Status</td>
+                                <td>
+                                    <span class="badge-status badge-{{ student.admission_status }}">
+                                        {{ student.get_admission_status_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted fw-500">Fee Status</td>
+                                <td>
+                                    <span class="badge-status badge-{{ student.fee_status }}">
+                                        {{ student.get_fee_status_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <div class="portal-card">
+                    <div class="portal-card-header">
+                        <h5><i class="bi bi-clock-history me-2 text-primary"></i>Audit & Franchise Info</h5>
+                    </div>
+                    <div class="portal-card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <small class="text-muted d-block">Franchise Center</small>
+                                <strong>{{ student.franchise.business_name|default:student.franchise }}</strong>
+                                <div class="text-muted small">{{ student.franchise.city }}, {{ student.franchise.state }}</div>
+                            </div>
+                            <div class="col-md-4">
+                                <small class="text-muted d-block">Registered By</small>
+                                {% if student.created_by %}
+                                    <strong>{{ student.created_by.get_full_name|default:student.created_by.username }}</strong>
+                                    <div class="text-muted small">{{ student.created_by.email }}</div>
+                                {% else %}
+                                    <strong>Admin / System</strong>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <small class="text-muted d-block">Registration Timestamp</small>
+                                <div>{{ student.created_at|date:"M j, Y, g:i a" }}</div>
+                                <small class="text-muted">Last Updated: {{ student.updated_at|date:"M j, Y, g:i a" }}</small>
+                            </div>
+                        </div>
+
+                        {% if student.remarks %}
+                            <div class="mt-3 pt-3 border-top">
+                                <small class="text-muted d-block fw-600 mb-1">Remarks / Internal Notes</small>
+                                <p class="mb-0 text-secondary small">{{ student.remarks|linebreaksbr }}</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

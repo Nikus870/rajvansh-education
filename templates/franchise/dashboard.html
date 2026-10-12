@@ -1,44 +1,198 @@
-{% extends 'base.html' %}
-{% block title %}Franchise Dashboard | {{site_settings.website_name}}{% endblock %}
+{% extends 'franchise/portal_base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+{% block breadcrumb %}<span class="separator">/</span> Dashboard{% endblock %}
+
 {% block content %}
-<section class="pagehero">
-    <div class="container d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <div>
-            <span class="eyebrow">Partner dashboard</span>
-            <h1>Welcome, {{request.user.first_name}}</h1>
-        </div>
-        <div>
-            <form method="post" action="{% url 'franchise:logout' %}" class="d-inline">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-outline-danger">Log out</button>
-            </form>
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h4 class="mb-1 fw-700" style="color:#0b2450;">
+            Welcome, {{ request.user.first_name|default:request.user.username }}
+        </h4>
+        <p class="text-muted mb-0 small">
+            {{ profile.business_name|default:"Rajvans Franchise" }} · {{ profile.city }}, {{ profile.state }}
+        </p>
+    </div>
+    <a href="{% url 'students:register' %}" class="btn btn-primary">
+        <i class="bi bi-person-plus me-1"></i> Register Student
+    </a>
+</div>
+
+<!-- ── Statistics ───────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-2">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#eaf0ff; color:#1456d9;">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div class="stat-value">{{ stats.total_students }}</div>
+            <div class="stat-label">Total Students</div>
         </div>
     </div>
-</section>
-<section class="section">
-    <div class="container">
-        <div class="row g-4">
-            <div class="col-lg-5">
-                <div class="feature">
-                    <h3>Profile</h3>
-                    <p>{{request.user.email}}</p>
-                    <p>{{profile.mobile}}<br>{{profile.city}}, {{profile.state}}<br>{{profile.business_name}}</p>
-                </div>
+    <div class="col-6 col-lg-2">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#e8f5e9; color:#2e7d32;">
+                <i class="bi bi-calendar-check"></i>
             </div>
-            <div class="col-lg-7">
-                <div class="feature">
-                    <h3>Applications</h3>
-                    {% for a in applications %}
-                        <div class="d-flex justify-content-between border-bottom py-3">
-                            <span>{{a.business_name|default:'Franchise application'}}<small class="d-block">{{a.created_at}}</small></span>
-                            <b class="badgex">{{a.get_status_display}}</b>
-                        </div>
-                    {% empty %}
-                        <p>No applications found.</p>
-                    {% endfor %}
-                </div>
+            <div class="stat-value">{{ stats.this_month }}</div>
+            <div class="stat-label">This Month</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#fff8e1; color:#f57f17;">
+                <i class="bi bi-hourglass-split"></i>
+            </div>
+            <div class="stat-value">{{ stats.pending_admissions }}</div>
+            <div class="stat-label">Pending Admission</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#e3f2fd; color:#1565c0;">
+                <i class="bi bi-patch-check"></i>
+            </div>
+            <div class="stat-value">{{ stats.admitted }}</div>
+            <div class="stat-label">Admitted</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#fce4ec; color:#c62828;">
+                <i class="bi bi-cash-coin"></i>
+            </div>
+            <div class="stat-value">{{ stats.fee_pending }}</div>
+            <div class="stat-label">Fee Pending</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#f3e5f5; color:#7b1fa2;">
+                <i class="bi bi-person-badge"></i>
+            </div>
+            <div class="stat-value">{{ stats.staff_count }}</div>
+            <div class="stat-label">Active Staff</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- ── Recent Students ───────────────────────────────────── -->
+    <div class="col-lg-8">
+        <div class="portal-card">
+            <div class="portal-card-header">
+                <h5><i class="bi bi-clock-history me-2 text-primary"></i>Recent Registrations</h5>
+                <a href="{% url 'students:list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="portal-card-body p-0">
+                {% if recent_students %}
+                    <table class="table portal-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Reg. No.</th>
+                                <th>Student</th>
+                                <th>Course</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in recent_students %}
+                            <tr>
+                                <td><code class="small">{{ student.registration_number }}</code></td>
+                                <td>
+                                    <strong>{{ student.full_name }}</strong>
+                                    <br><small class="text-muted">{{ student.mobile }}</small>
+                                </td>
+                                <td>
+                                    <span class="small">{{ student.course.name }}</span>
+                                    <br><small class="text-muted">{{ student.university.name }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge-status badge-{{ student.admission_status }}">
+                                        {{ student.get_admission_status_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{% url 'students:detail' student.pk %}"
+                                       class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-people text-muted"></i>
+                        <p class="fw-500">No students registered yet</p>
+                        <a href="{% url 'students:register' %}" class="btn btn-primary btn-sm">
+                            Register First Student
+                        </a>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
-</section>
+
+    <!-- ── Quick Actions + Info ──────────────────────────────── -->
+    <div class="col-lg-4">
+        <div class="portal-card mb-3">
+            <div class="portal-card-header">
+                <h5><i class="bi bi-lightning me-2 text-warning"></i>Quick Actions</h5>
+            </div>
+            <div class="portal-card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'students:register' %}" class="btn btn-primary">
+                        <i class="bi bi-person-plus me-2"></i>Register Student
+                    </a>
+                    <a href="{% url 'students:list' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-search me-2"></i>Search Students
+                    </a>
+                    <a href="{% url 'franchise:staff_invite' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-person-badge me-2"></i>Invite Staff
+                    </a>
+                    <a href="{% url 'students:export_csv' %}" class="btn btn-outline-success">
+                        <i class="bi bi-download me-2"></i>Export to CSV
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="portal-card">
+            <div class="portal-card-header">
+                <h5><i class="bi bi-building me-2 text-secondary"></i>Your Franchise</h5>
+            </div>
+            <div class="portal-card-body">
+                <table class="table table-sm table-borderless mb-0 small">
+                    <tr>
+                        <td class="text-muted pe-3">Email</td>
+                        <td>{{ request.user.email }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-3">Mobile</td>
+                        <td>{{ profile.mobile }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-3">Location</td>
+                        <td>{{ profile.city }}, {{ profile.state }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-3">Business</td>
+                        <td>{{ profile.business_name|default:"—" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-3">Member since</td>
+                        <td>{{ profile.created_at|date:"M j, Y" }}</td>
+                    </tr>
+                </table>
+                <a href="{% url 'franchise:profile' %}" class="btn btn-sm btn-outline-secondary mt-2 w-100">
+                    View Full Profile
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

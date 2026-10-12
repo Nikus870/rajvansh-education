@@ -68,6 +68,16 @@
                             <button type="submit" class="btn btn-nav-secondary btn-sm">Logout</button>
                         </form>
                     </li>
+                {% elif request.user.is_authenticated and request.user.franchise_staff_profile %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'franchise:staff_dashboard' %}">Staff Dashboard</a>
+                    </li>
+                    <li class="nav-item ms-lg-2">
+                        <form method="post" action="{% url 'franchise:logout' %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-nav-secondary btn-sm">Logout</button>
+                        </form>
+                    </li>
                 {% else %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'franchise:landing' %}">Franchise</a>
@@ -95,7 +105,7 @@
 {% if messages %}
     <div class="container mt-3 site-messages">
         {% for message in messages %}
-            <div class="alert alert-success" role="alert">{{ message }}</div>
+            <div class="alert {% if 'error' in message.tags %}alert-danger{% elif 'warning' in message.tags %}alert-warning{% elif 'info' in message.tags %}alert-info{% else %}alert-success{% endif %}" role="alert">{{ message }}</div>
         {% endfor %}
     </div>
 {% endif %}

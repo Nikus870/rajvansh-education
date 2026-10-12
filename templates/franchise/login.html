@@ -16,7 +16,7 @@ Franchise Login | {{ site_settings.website_name }}
             <!-- Django messages -->
             {% if messages %}
                 {% for message in messages %}
-                    <div class="alert alert-danger mb-3">
+                    <div class="alert {% if 'error' in message.tags %}alert-danger{% elif 'warning' in message.tags %}alert-warning{% elif 'info' in message.tags %}alert-info{% else %}alert-success{% endif %} mb-3">
                         {{ message }}
                     </div>
                 {% endfor %}
@@ -33,6 +33,9 @@ Franchise Login | {{ site_settings.website_name }}
 
             <form method="post">
                 {% csrf_token %}
+                {% if next_url %}
+                    <input type="hidden" name="next" value="{{ next_url }}">
+                {% endif %}
 
                 {% for f in form %}
                     {% include 'includes/form_field.html' with field=f %}
@@ -40,10 +43,16 @@ Franchise Login | {{ site_settings.website_name }}
 
                 <button
                     type="submit"
-                    class="btn btn-primary w-100"
+                    class="btn btn-primary w-100 mb-3"
                 >
                     Login
                 </button>
+
+                <div class="text-center">
+                    <a href="{% url 'franchise:forgot_password' %}" class="text-muted small">
+                        Forgot Password?
+                    </a>
+                </div>
             </form>
 
         </div>
