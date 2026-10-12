@@ -367,7 +367,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT_ENV = os.getenv("MEDIA_ROOT", "").strip()
+MEDIA_ROOT = Path(MEDIA_ROOT_ENV) if MEDIA_ROOT_ENV else BASE_DIR / "media"
 MEDIA_STORAGE_BACKEND = os.getenv(
     "MEDIA_STORAGE_BACKEND",
     "django.core.files.storage.FileSystemStorage",
@@ -381,10 +382,24 @@ except json.JSONDecodeError as exc:
 if not isinstance(MEDIA_STORAGE_OPTIONS, dict):
     raise ImproperlyConfigured("MEDIA_STORAGE_OPTIONS must be a JSON object.")
 
-if not DEBUG and not TESTING and MEDIA_STORAGE_BACKEND == "django.core.files.storage.FileSystemStorage":
-    raise ImproperlyConfigured(
-        "Configure a durable MEDIA_STORAGE_BACKEND for production media."
-    )
+if not DEBUG and not TESTING:
+    if MEDIA_STORAGE_BACKEND == "django.core.files.storage.FileSystemStorage":
+        if not MEDIA_ROOT_ENV or not MEDIA_ROOT.is_absolute():
+            raise ImproperlyConfigured(
+                "For production FileSystemStorage, set MEDIA_ROOT to the absolute "
+                "mount path of a durable persistent disk, such as /var/data."
+            )
+
+        storage_location = MEDIA_STORAGE_OPTIONS.get("location")
+        if storage_location is not None:
+            if (
+                not isinstance(storage_location, str)
+                or Path(storage_location).resolve() != MEDIA_ROOT.resolve()
+            ):
+                raise ImproperlyConfigured(
+                    "MEDIA_STORAGE_OPTIONS.location must match MEDIA_ROOT when "
+                    "using production FileSystemStorage."
+                )
 
 
 # =========================================================
