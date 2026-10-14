@@ -2,7 +2,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import unquote, urlparse
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -39,10 +39,7 @@ if env_file.is_file():
 
 def boolean(name, default=False):
     return os.getenv(name, str(default)).lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
+        "1", "true", "yes", "on"
     }
 
 
@@ -58,10 +55,7 @@ def listenv(name, default=""):
 # TESTING
 # =========================================================
 
-TESTING = (
-    "test" in sys.argv
-    or "pytest" in sys.modules
-)
+TESTING = "test" in sys.argv or "pytest" in sys.modules
 
 
 # =========================================================
@@ -75,10 +69,7 @@ DEBUG = boolean("DEBUG", TESTING)
 # SECRET KEY
 # =========================================================
 
-SECRET_KEY = os.getenv(
-    "SECRET_KEY",
-    "dev-only-change-this",
-)
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-this")
 
 if not DEBUG and not TESTING:
     if not SECRET_KEY or SECRET_KEY in {
@@ -86,8 +77,7 @@ if not DEBUG and not TESTING:
         "change-me-in-production",
     }:
         raise ImproperlyConfigured(
-            "SECRET_KEY must be set to a secure, unique value "
-            "when DEBUG is False in production."
+            "SECRET_KEY must be set to a secure, unique value in production."
         )
 
 
@@ -102,7 +92,7 @@ ALLOWED_HOSTS = listenv(
 
 if not DEBUG and not TESTING and not os.getenv("ALLOWED_HOSTS"):
     raise ImproperlyConfigured(
-        "ALLOWED_HOSTS must be explicitly configured when DEBUG is False."
+        "ALLOWED_HOSTS must be configured in production."
     )
 
 
@@ -125,7 +115,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    # Project applications
     "apps.core",
     "apps.courses",
     "apps.universities",
@@ -176,9 +165,7 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [
-            BASE_DIR / "templates",
-        ],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -213,15 +200,10 @@ if not DEBUG and not TESTING and not DATABASE_URL:
 if DATABASE_URL.startswith(("postgres://", "postgresql://")):
     parsed_database_url = urlparse(DATABASE_URL)
 
-    if (
-        not parsed_database_url.hostname
-        or not parsed_database_url.path.strip("/")
-    ):
+    if not parsed_database_url.hostname or not parsed_database_url.path.strip("/"):
         raise ImproperlyConfigured(
             "DATABASE_URL must include a host and database name."
         )
-
-    database_options = parse_qs(parsed_database_url.query)
 
     DATABASES = {
         "default": {
@@ -233,7 +215,8 @@ if DATABASE_URL.startswith(("postgres://", "postgresql://")):
             "PORT": parsed_database_url.port or 5432,
             "OPTIONS": {
                 key: values[-1]
-                for key, values in database_options.items()
+                for key, values in __import__("urllib.parse", fromlist=["parse_qs"])
+                .parse_qs(parsed_database_url.query).items()
                 if key in {
                     "sslmode",
                     "connect_timeout",
@@ -245,8 +228,7 @@ if DATABASE_URL.startswith(("postgres://", "postgresql://")):
 
 elif DATABASE_URL:
     raise ImproperlyConfigured(
-        "DATABASE_URL must use the PostgreSQL postgres:// "
-        "or postgresql:// scheme."
+        "DATABASE_URL must use the PostgreSQL postgres:// or postgresql:// scheme."
     )
 
 else:
@@ -325,15 +307,12 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT_ENV = os.getenv("MEDIA_ROOT", "").strip()
 
 if DEBUG or TESTING:
-    # Preserve existing local development behavior.
     MEDIA_ROOT = (
         Path(MEDIA_ROOT_ENV)
         if MEDIA_ROOT_ENV
         else BASE_DIR / "media"
     )
 else:
-    # Render Free has no persistent local disk by default.
-    # This directory is temporary and is NOT durable storage.
     MEDIA_ROOT = (
         Path(MEDIA_ROOT_ENV)
         if MEDIA_ROOT_ENV
@@ -344,6 +323,11 @@ else:
         raise ImproperlyConfigured(
             "MEDIA_ROOT must be an absolute directory path."
         )
+
+
+# =========================================================
+# STORAGE
+# =========================================================
 
 MEDIA_STORAGE_BACKEND = os.getenv(
     "MEDIA_STORAGE_BACKEND",
@@ -379,14 +363,8 @@ if (
             != MEDIA_ROOT.resolve()
         ):
             raise ImproperlyConfigured(
-                "MEDIA_STORAGE_OPTIONS.location must match MEDIA_ROOT "
-                "when using FileSystemStorage."
+                "MEDIA_STORAGE_OPTIONS.location must match MEDIA_ROOT."
             )
-
-
-# =========================================================
-# STORAGE
-# =========================================================
 
 STORAGES = {
     "default": {
@@ -499,25 +477,26 @@ DEFAULT_FROM_EMAIL = os.getenv(
     "no-reply@example.invalid",
 )
 
-if not DEBUG and not TESTING:
-    if EMAIL_BACKEND.endswith("console.EmailBackend"):
-        raise ImproperlyConfigured(
-            "A non-console EMAIL_BACKEND must be configured "
-            "when DEBUG is False."
-        )
+# SMTP details are validated when an SMTP host is configured.
+# If no host is configured, deployment can start, but SMTP email
+# sending will not work until valid provider settings are added.
+if EMAIL_HOST:
+    if EMAIL_BACKEND.endswith("smtp.EmailBackend"):
+        if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
+            if not DEBUG and not TESTING:
+                raise ImproperlyConfigured(
+                    "Configure EMAIL_HOST_USER and EMAIL_HOST_PASSWORD "
+                    "for SMTP authentication."
+                )
 
-    if (
-        EMAIL_BACKEND.endswith("smtp.EmailBackend")
-        and not EMAIL_HOST
-    ):
-        raise ImproperlyConfigured(
-            "EMAIL_HOST must be configured for the production SMTP backend."
-        )
-
-    if DEFAULT_FROM_EMAIL.endswith("@example.invalid"):
-        raise ImproperlyConfigured(
-            "DEFAULT_FROM_EMAIL must be configured with a verified sender."
-        )
+        if (
+            not DEBUG
+            and not TESTING
+            and DEFAULT_FROM_EMAIL.endswith("@example.invalid")
+        ):
+            raise ImproperlyConfigured(
+                "Configure DEFAULT_FROM_EMAIL with a verified sender address."
+            )
 
 if EMAIL_USE_TLS and EMAIL_USE_SSL:
     raise ImproperlyConfigured(
