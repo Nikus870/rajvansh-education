@@ -191,7 +191,7 @@ class FranchiseApplicationAdmin(admin.ModelAdmin):
                     f"{application.email} already belongs to an account and cannot be approved.",
                     level=messages.ERROR,
                 )
-                continue
+                continue  
 
             user = User(
                 username=application.email,
