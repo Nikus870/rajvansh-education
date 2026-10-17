@@ -6,7 +6,6 @@ from urllib.parse import unquote, urlparse
 
 from django.core.exceptions import ImproperlyConfigured
 
-
 # =========================================================
 # BASE DIRECTORY
 # =========================================================
@@ -474,8 +473,10 @@ EMAIL_USE_SSL = boolean("EMAIL_USE_SSL", False)
 
 DEFAULT_FROM_EMAIL = os.getenv(
     "DEFAULT_FROM_EMAIL",
-    "no-reply@example.invalid",
+    "onboarding@resend.dev",
 )
+
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 
 if not DEBUG and not TESTING:
     if not EMAIL_BACKEND.endswith("smtp.EmailBackend"):

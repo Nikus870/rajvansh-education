@@ -1,11 +1,10 @@
 import logging
-import smtplib
 from secrets import token_urlsafe
 
+import resend
 from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.auth.models import User
-from django.core.mail import get_connection, send_mail
 from django.urls import reverse
 from django.utils import timezone
 
@@ -22,11 +21,8 @@ logger = logging.getLogger(__name__)
 
 def _send_activation_email(request, application, *, renew=False):
     """
-    Send a franchise activation email.
-
-    SMTP failures are handled without crashing the Django Admin request.
-    The application and activation token remain in the database if email
-    delivery fails.
+    Send a franchise activation email through the Resend HTTPS API.
+    Existing approval and token records remain intact if delivery fails.
     """
     token, _ = FranchiseActivationToken.objects.get_or_create(
         application=application,
@@ -61,27 +57,48 @@ Regards,
 Rajvansh Group of Educations
 """
 
+    api_key = getattr(settings, "RESEND_API_KEY", "")
+
+    if not api_key:
+        logger.error(
+            "RESEND_API_KEY is missing; activation email not sent "
+            "for application ID %s.",
+            application.pk,
+        )
+        return False
+
     try:
-        connection = get_connection(
-            fail_silently=False,
-            timeout=10,
+        resend.api_key = api_key
+
+        response = resend.Emails.send(
+            {
+                "from": settings.DEFAULT_FROM_EMAIL,
+                "to": [application.email],
+                "subject": (
+                    "Franchise Account Approved - "
+                    "Rajvansh Group of Educations"
+                ),
+                "text": message.strip(),
+            }
         )
 
-        return (
-            send_mail(
-                subject="Franchise Account Approved - Rajvansh Group of Educations",
-                message=message.strip(),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[application.email],
-                fail_silently=False,
-                connection=connection,
+        if isinstance(response, dict) and response.get("id"):
+            logger.info(
+                "Resend accepted activation email for application ID %s.",
+                application.pk,
             )
-            == 1
+            return True
+
+        logger.error(
+            "Resend returned an unexpected response for application ID %s: %r",
+            application.pk,
+            response,
         )
+        return False
 
     except Exception:
         logger.exception(
-            "Activation email delivery failed for application ID %s.",
+            "Resend API failed for application ID %s.",
             application.pk,
         )
         return False
