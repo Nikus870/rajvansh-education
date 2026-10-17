@@ -42,6 +42,7 @@ from .forms import (
 )
 from .models import (
     FranchiseActivationToken,
+    FranchiseApplication,
     FranchiseStaff,
     FranchiseStaffInvitation,
 )
@@ -234,72 +235,75 @@ def franchise_login(request):
 
 
 def activate_account(request, token):
-    activation = get_object_or_404(
-        FranchiseActivationToken.objects.select_related(
-            "application",
-            "application__user",
-        ),
-        token=token,
-    )
-
-    if activation.used:
-        messages.error(request, "This activation link has already been used.")
-        return redirect("franchise:login")
-
-    if activation.is_expired:
-        messages.error(
-            request,
-            "This activation link has expired (valid for 24 hours). "
-            "Please contact the administrator to send a new link.",
-        )
-        return redirect("franchise:login")
-
-    application = activation.application
-
-    if application.status != "approved":
-        messages.error(
-            request,
-            "This franchise application has not been approved.",
-        )
-        return redirect("franchise:login")
-
-    if not application.user:
-        messages.error(
-            request,
-            "The franchise account has not been created yet.",
-        )
-        return redirect("franchise:login")
-
-    user = application.user
-    if user.is_staff or user.is_superuser:
-        messages.error(
-            request,
-            "This account has administrative privileges and cannot be activated "
-            "as a franchise account. Please contact the administrator.",
-        )
-        return redirect("franchise:login")
-
     form = FranchiseSetPasswordForm(request.POST or None)
 
     if request.method == "POST" and form.is_valid():
-        # Validate with Django password validators
-        try:
-            validate_password(form.cleaned_data["password1"], user)
-        except ValidationError as e:
-            form.add_error("password1", e)
+        password_error = None
+        activation_valid = False
+
+        with transaction.atomic():
+            try:
+                activation = FranchiseActivationToken.objects.select_for_update().get(
+                    token=token
+                )
+            except FranchiseActivationToken.DoesNotExist:
+                activation = None
+
+            if activation is not None:
+                application = (
+                    FranchiseApplication.objects.select_for_update()
+                    .filter(pk=activation.application_id)
+                    .first()
+                )
+                user = None
+                if application and application.user_id:
+                    user = (
+                        User.objects.select_for_update()
+                        .filter(pk=application.user_id)
+                        .first()
+                    )
+
+                activation_valid = bool(
+                    not activation.used
+                    and not activation.is_expired
+                    and application
+                    and application.status == "approved"
+                    and user
+                    and not user.is_active
+                    and not user.is_staff
+                    and not user.is_superuser
+                    and application.email.strip().casefold()
+                    == user.email.strip().casefold()
+                )
+
+                if activation_valid:
+                    try:
+                        validate_password(form.cleaned_data["password1"], user)
+                    except ValidationError as error:
+                        password_error = error
+                    else:
+                        user.set_password(form.cleaned_data["password1"])
+                        user.is_active = True
+                        user.save(update_fields=["password", "is_active"])
+
+                        activation.used = True
+                        activation.save(update_fields=["used"])
+
+        if password_error:
+            form.add_error("password1", password_error)
             return render(
                 request,
                 "franchise/activate.html",
                 {"form": form, "application": application},
             )
 
-        with transaction.atomic():
-            user.set_password(form.cleaned_data["password1"])
-            user.is_active = True
-            user.save(update_fields=["password", "is_active"])
-
-            activation.used = True
-            activation.save(update_fields=["used"])
+        if not activation_valid:
+            messages.error(
+                request,
+                "This activation link is invalid or unavailable. "
+                "Please contact the administrator.",
+            )
+            return redirect("franchise:login")
 
         login(
             request,
@@ -311,6 +315,36 @@ def activate_account(request, token):
             "Your franchise account has been activated successfully. Welcome!",
         )
         return redirect("franchise:dashboard")
+
+    activation = (
+        FranchiseActivationToken.objects.select_related(
+            "application",
+            "application__user",
+        )
+        .filter(token=token)
+        .first()
+    )
+    application = activation.application if activation else None
+    user = application.user if application and application.user_id else None
+    activation_valid = bool(
+        activation
+        and not activation.used
+        and not activation.is_expired
+        and application.status == "approved"
+        and user
+        and not user.is_active
+        and not user.is_staff
+        and not user.is_superuser
+        and application.email.strip().casefold() == user.email.strip().casefold()
+    )
+
+    if not activation_valid:
+        messages.error(
+            request,
+            "This activation link is invalid or unavailable. "
+            "Please contact the administrator.",
+        )
+        return redirect("franchise:login")
 
     return render(
         request,

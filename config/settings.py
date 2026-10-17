@@ -477,26 +477,27 @@ DEFAULT_FROM_EMAIL = os.getenv(
     "no-reply@example.invalid",
 )
 
-# SMTP details are validated when an SMTP host is configured.
-# If no host is configured, deployment can start, but SMTP email
-# sending will not work until valid provider settings are added.
-if EMAIL_HOST:
-    if EMAIL_BACKEND.endswith("smtp.EmailBackend"):
-        if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
-            if not DEBUG and not TESTING:
-                raise ImproperlyConfigured(
-                    "Configure EMAIL_HOST_USER and EMAIL_HOST_PASSWORD "
-                    "for SMTP authentication."
-                )
-
-        if (
-            not DEBUG
-            and not TESTING
-            and DEFAULT_FROM_EMAIL.endswith("@example.invalid")
-        ):
-            raise ImproperlyConfigured(
-                "Configure DEFAULT_FROM_EMAIL with a verified sender address."
-            )
+if not DEBUG and not TESTING:
+    if not EMAIL_BACKEND.endswith("smtp.EmailBackend"):
+        raise ImproperlyConfigured(
+            "EMAIL_BACKEND must use SMTP in production."
+        )
+    if not EMAIL_HOST.strip():
+        raise ImproperlyConfigured(
+            "EMAIL_HOST must be configured in production."
+        )
+    if not EMAIL_HOST_USER.strip() or not EMAIL_HOST_PASSWORD:
+        raise ImproperlyConfigured(
+            "Configure EMAIL_HOST_USER and EMAIL_HOST_PASSWORD "
+            "for SMTP authentication."
+        )
+    if (
+        not DEFAULT_FROM_EMAIL.strip()
+        or DEFAULT_FROM_EMAIL.lower().endswith("@example.invalid")
+    ):
+        raise ImproperlyConfigured(
+            "Configure DEFAULT_FROM_EMAIL with a verified sender address."
+        )
 
 if EMAIL_USE_TLS and EMAIL_USE_SSL:
     raise ImproperlyConfigured(

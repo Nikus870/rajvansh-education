@@ -358,6 +358,52 @@ class FranchiseUpgradeIntegrationTests(TestCase):
         token.refresh_from_db()
         self.assertTrue(token.used)
 
+        self.client.logout()
+        repeated_response = self.client.post(
+            reverse("franchise:activate", kwargs={"token": token.token}),
+            {
+                "password1": "AnotherPassUdaipur123!",
+                "password2": "AnotherPassUdaipur123!",
+            },
+        )
+        self.assertRedirects(repeated_response, reverse("franchise:login"))
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("NewPassUdaipur123!"))
+
+    def test_activation_rejects_application_user_email_mismatch(self):
+        app = FranchiseApplication.objects.create(
+            name="Mismatched Applicant",
+            email="applicant@example.com",
+            mobile="9829011111",
+            city="Jaipur",
+            state="Rajasthan",
+            status="approved",
+        )
+        user = User.objects.create_user(
+            username="other-account@example.com",
+            email="other-account@example.com",
+            password="OriginalPass123!",
+            is_active=False,
+        )
+        app.user = user
+        app.save(update_fields=["user"])
+        token = FranchiseActivationToken.objects.create(
+            application=app,
+            token="mismatched-activation-token",
+        )
+
+        response = self.client.post(
+            reverse("franchise:activate", kwargs={"token": token.token}),
+            {"password1": "NewPassUdaipur123!", "password2": "NewPassUdaipur123!"},
+        )
+
+        self.assertRedirects(response, reverse("franchise:login"))
+        user.refresh_from_db()
+        token.refresh_from_db()
+        self.assertFalse(user.is_active)
+        self.assertTrue(user.check_password("OriginalPass123!"))
+        self.assertFalse(token.used)
+
     def test_expired_activation_token_rejected(self):
         app = FranchiseApplication.objects.create(
             name="Late User",
@@ -554,6 +600,29 @@ class FranchiseUpgradeIntegrationTests(TestCase):
         self.assertIn("Password Reset", mail.outbox[0].subject)
         self.assertIn("owner1@jaipur.com", mail.outbox[0].to)
 
+    def test_forgot_password_response_does_not_disclose_unknown_email(self):
+        mail.outbox = []
+
+        known_response = self.client.post(
+            reverse("franchise:forgot_password"),
+            {"email": "owner1@jaipur.com"},
+            follow=True,
+        )
+        known_messages = [str(message) for message in known_response.context["messages"]]
+
+        unknown_response = self.client.post(
+            reverse("franchise:forgot_password"),
+            {"email": "not-registered@example.com"},
+            follow=True,
+        )
+        unknown_messages = [
+            str(message) for message in unknown_response.context["messages"]
+        ]
+
+        self.assertEqual(known_response.redirect_chain, unknown_response.redirect_chain)
+        self.assertEqual(known_messages, unknown_messages)
+        self.assertEqual(len(mail.outbox), 1)
+
     def test_password_reset_token_expires_after_one_hour_and_is_single_use(self):
         from django.conf import settings
         from django.utils.http import urlsafe_base64_encode
@@ -589,6 +658,29 @@ class FranchiseUpgradeIntegrationTests(TestCase):
         reuse_response = self.client.get(reset_url)
         self.assertEqual(reuse_response.status_code, 302)
         self.assertEqual(reuse_response.url, reverse("franchise:forgot_password"))
+
+    def test_password_reset_does_not_activate_inactive_account(self):
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+
+        self.owner1_user.is_active = False
+        self.owner1_user.save(update_fields=["is_active"])
+        uid = urlsafe_base64_encode(force_bytes(self.owner1_user.pk))
+        token = default_token_generator.make_token(self.owner1_user)
+        reset_url = reverse(
+            "franchise:reset_password",
+            kwargs={"uidb64": uid, "token": token},
+        )
+
+        response = self.client.post(
+            reset_url,
+            {"password1": "NewSecurePass123!", "password2": "NewSecurePass123!"},
+        )
+
+        self.assertRedirects(response, reverse("franchise:login"))
+        self.owner1_user.refresh_from_db()
+        self.assertFalse(self.owner1_user.is_active)
+        self.assertTrue(self.owner1_user.check_password("NewSecurePass123!"))
 
     # ── Strict Franchise Data Isolation Tests ────────────────────────────────
 
