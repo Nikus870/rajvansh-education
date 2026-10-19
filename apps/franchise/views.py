@@ -40,6 +40,7 @@ from .forms import (
     FranchiseForgotPasswordForm,
     FranchisePasswordResetForm,
 )
+from .analytics import get_student_growth_analytics
 from .models import (
     FranchiseActivationToken,
     FranchiseApplication,
@@ -377,19 +378,18 @@ def dashboard(request):
         return redirect("core:home")
 
     profile = request.user.franchise_profile
-    today = timezone.now().date()
-    month_start = today.replace(day=1)
 
     # Import here to avoid circular imports
     from apps.students.models import Student
 
     students_qs = Student.objects.filter(franchise=profile)
+    analytics = get_student_growth_analytics(profile)
 
     stats = {
-        "total_students": students_qs.count(),
-        "this_month": students_qs.filter(
-            created_at__date__gte=month_start
-        ).count(),
+        "total_students": analytics["total"],
+        "this_month": analytics["this_month"],
+        "previous_month": analytics["previous_month"],
+        "growth_percentage": analytics["growth_percentage"],
         "pending_admissions": students_qs.filter(
             admission_status="pending"
         ).count(),
@@ -411,6 +411,7 @@ def dashboard(request):
             "profile": profile,
             "applications": request.user.franchise_applications.all(),
             "stats": stats,
+            "analytics": analytics,
             "recent_students": recent_students,
         },
     )
@@ -424,15 +425,16 @@ def staff_dashboard(request):
 
     staff_profile = request.user.franchise_staff_profile
     franchise = staff_profile.franchise
-    today = timezone.now().date()
-    month_start = today.replace(day=1)
 
     from apps.students.models import Student
     students_qs = Student.objects.filter(franchise=franchise)
+    analytics = get_student_growth_analytics(franchise)
 
     stats = {
-        "total_students": students_qs.count(),
-        "this_month": students_qs.filter(created_at__date__gte=month_start).count(),
+        "total_students": analytics["total"],
+        "this_month": analytics["this_month"],
+        "previous_month": analytics["previous_month"],
+        "growth_percentage": analytics["growth_percentage"],
         "my_registrations": students_qs.filter(created_by=request.user).count(),
     }
 
@@ -443,6 +445,7 @@ def staff_dashboard(request):
             "staff_profile": staff_profile,
             "franchise": franchise,
             "stats": stats,
+            "analytics": analytics,
         },
     )
 

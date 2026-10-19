@@ -119,6 +119,7 @@ class FranchiseProfileAdmin(admin.ModelAdmin):
         "mobile",
         "city",
         "state",
+        "monthly_student_target",
         "created_at",
     )
 

@@ -16,9 +16,11 @@ Franchise Login | {{ site_settings.website_name }}
             <!-- Django messages -->
             {% if messages %}
                 {% for message in messages %}
-                    <div class="alert {% if 'error' in message.tags %}alert-danger{% elif 'warning' in message.tags %}alert-warning{% elif 'info' in message.tags %}alert-info{% else %}alert-success{% endif %} mb-3">
-                        {{ message }}
-                    </div>
+                    {% if message != "Django Admin accounts do not automatically have franchise access. Use an approved franchise owner or staff account to sign in here." %}
+                        <div class="alert {% if 'error' in message.tags %}alert-danger{% elif 'warning' in message.tags %}alert-warning{% elif 'info' in message.tags %}alert-info{% else %}alert-success{% endif %} mb-3">
+                            {{ message }}
+                        </div>
+                    {% endif %}
                 {% endfor %}
             {% endif %}
 

@@ -16,7 +16,7 @@
     <div class="col-lg-10">
         <div class="d-flex align-items-center justify-content-between mb-4">
             <div>
-                <h4 class="mb-1 fw-700" style="color:#0b2450;">Edit Student Information</h4>
+                <h4 class="mb-1 fw-700">Edit Student Information</h4>
                 <p class="text-muted mb-0 small">Updating records for <code>{{ student.registration_number }}</code> ({{ student.full_name }})</p>
             </div>
             <a href="{% url 'students:detail' student.pk %}" class="btn btn-outline-secondary btn-sm">
@@ -37,7 +37,7 @@
                 {% endif %}
 
                 <!-- Section 1: Personal Details -->
-                <h6 class="fw-700 mb-3 pb-2 border-bottom" style="color:#0b2450;">
+                <h6 class="fw-700 mb-3 pb-2 border-bottom">
                     <i class="bi bi-person me-2 text-primary"></i>Personal Information
                 </h6>
                 <div class="row g-3 mb-4">
@@ -93,7 +93,7 @@
                 </div>
 
                 <!-- Section 2: Academic & Admission Details -->
-                <h6 class="fw-700 mb-3 pb-2 border-bottom" style="color:#0b2450;">
+                <h6 class="fw-700 mb-3 pb-2 border-bottom">
                     <i class="bi bi-mortarboard me-2 text-primary"></i>Academic & Admission
                 </h6>
                 <div class="row g-3 mb-4">
@@ -135,7 +135,7 @@
                 </div>
 
                 <!-- Section 3: Status & Remarks -->
-                <h6 class="fw-700 mb-3 pb-2 border-bottom" style="color:#0b2450;">
+                <h6 class="fw-700 mb-3 pb-2 border-bottom">
                     <i class="bi bi-info-circle me-2 text-primary"></i>Status & Fee Details
                 </h6>
                 <div class="row g-3 mb-4">

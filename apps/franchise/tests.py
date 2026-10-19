@@ -1,4 +1,5 @@
 from unittest.mock import patch
+from datetime import date, datetime, time
 
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
@@ -6,9 +7,11 @@ from django.core.files.storage import InMemoryStorage
 from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from pypdf import PdfReader
 
 from apps.courses.models import Course, CourseCategory
+from apps.franchise.analytics import get_student_growth_analytics
 from apps.franchise.certificate_service import (
     approve_certificate_request,
     reject_certificate_request,
@@ -22,6 +25,215 @@ from apps.franchise.models import (
 )
 from apps.students.models import Student
 from apps.universities.models import University
+
+
+class StudentGrowthAnalyticsTests(TestCase):
+    def setUp(self):
+        self.university = University.objects.create(
+            name="Growth University",
+            slug="growth-university",
+            description="Analytics test institution",
+        )
+        category = CourseCategory.objects.create(
+            name="Growth Category",
+            slug="growth-category",
+        )
+        self.course = Course.objects.create(
+            name="Growth Course",
+            slug="growth-course",
+            category=category,
+            university=self.university,
+            short_description="Course",
+            full_description="Course description",
+        )
+        self.owner = User.objects.create_user(
+            username="growth-owner",
+            password="safe-test-password",
+        )
+        self.franchise = FranchiseProfile.objects.create(
+            user=self.owner,
+            mobile="9999999901",
+            city="Kota",
+            state="Rajasthan",
+            monthly_student_target=4,
+        )
+        self.staff_user = User.objects.create_user(
+            username="growth-staff",
+            password="safe-test-password",
+        )
+        self.staff = FranchiseStaff.objects.create(
+            franchise=self.franchise,
+            user=self.staff_user,
+            name="Growth Staff",
+            email="growth-staff@example.com",
+        )
+        self.other_owner = User.objects.create_user(
+            username="other-growth-owner",
+            password="safe-test-password",
+        )
+        self.other_franchise = FranchiseProfile.objects.create(
+            user=self.other_owner,
+            mobile="9999999902",
+            city="Ajmer",
+            state="Rajasthan",
+        )
+        self.analytics_date = date(2026, 6, 15)
+
+    def create_student(self, franchise=None, created_at=None, name="Analytics Student"):
+        student = Student.objects.create(
+            full_name=name,
+            mobile="9999999903",
+            course=self.course,
+            university=self.university,
+            franchise=franchise or self.franchise,
+            created_by=self.owner,
+        )
+        if created_at:
+            local_timestamp = timezone.make_aware(
+                datetime.combine(created_at, time(12)),
+                timezone.get_current_timezone(),
+            )
+            Student.objects.filter(pk=student.pk).update(created_at=local_timestamp)
+        return student
+
+    def test_total_current_and_previous_month_counts_and_growth(self):
+        self.create_student(created_at=date(2026, 6, 1))
+        self.create_student(created_at=date(2026, 6, 15))
+        self.create_student(created_at=date(2026, 6, 30))
+        self.create_student(created_at=date(2026, 5, 5))
+        self.create_student(created_at=date(2026, 5, 25))
+        self.create_student(created_at=date(2026, 4, 10))
+
+        analytics = get_student_growth_analytics(
+            self.franchise,
+            as_of=self.analytics_date,
+        )
+
+        self.assertEqual(analytics["total"], 6)
+        self.assertEqual(analytics["this_month"], 3)
+        self.assertEqual(analytics["previous_month"], 2)
+        self.assertEqual(analytics["growth_percentage"], 50)
+
+    def test_chart_has_six_calendar_months_and_includes_empty_months(self):
+        self.create_student(created_at=date(2026, 1, 10))
+        self.create_student(created_at=date(2026, 3, 10))
+        self.create_student(created_at=date(2026, 3, 20))
+        self.create_student(created_at=date(2026, 5, 10))
+        self.create_student(created_at=date(2026, 5, 20))
+        self.create_student(created_at=date(2026, 6, 10))
+
+        analytics = get_student_growth_analytics(
+            self.franchise,
+            as_of=self.analytics_date,
+        )
+
+        self.assertEqual(
+            analytics["chart_labels"],
+            ["January 2026", "February 2026", "March 2026",
+             "April 2026", "May 2026", "June 2026"],
+        )
+        self.assertEqual(analytics["chart_counts"], [1, 0, 2, 0, 2, 1])
+        self.assertEqual(len(analytics["chart_data"]), 6)
+
+    def test_zero_previous_month_has_no_growth_percentage(self):
+        self.create_student(created_at=date(2026, 6, 10))
+
+        analytics = get_student_growth_analytics(
+            self.franchise,
+            as_of=self.analytics_date,
+        )
+
+        self.assertIsNone(analytics["growth_percentage"])
+
+    def test_empty_dataset_returns_zero_counts_and_full_chart(self):
+        analytics = get_student_growth_analytics(
+            self.franchise,
+            as_of=self.analytics_date,
+        )
+
+        self.assertEqual(analytics["total"], 0)
+        self.assertEqual(analytics["this_month"], 0)
+        self.assertEqual(analytics["previous_month"], 0)
+        self.assertIsNone(analytics["growth_percentage"])
+        self.assertEqual(analytics["chart_counts"], [0, 0, 0, 0, 0, 0])
+        self.assertEqual(analytics["target_remaining"], 4)
+        self.assertEqual(analytics["target_progress"], 0)
+        self.assertEqual(analytics["reached_milestones"], [])
+        self.assertEqual(analytics["next_milestone"]["remaining"], 10)
+
+    def test_target_progress_remaining_and_progress_bar_cap(self):
+        for _ in range(3):
+            self.create_student(created_at=date(2026, 6, 10))
+
+        analytics = get_student_growth_analytics(
+            self.franchise,
+            as_of=self.analytics_date,
+        )
+        self.assertEqual(analytics["target"], 4)
+        self.assertEqual(analytics["target_remaining"], 1)
+        self.assertEqual(analytics["target_progress"], 75)
+        self.assertEqual(analytics["target_progress_bar"], 75)
+
+        self.create_student(created_at=date(2026, 6, 12))
+        self.create_student(created_at=date(2026, 6, 13))
+        analytics = get_student_growth_analytics(
+            self.franchise,
+            as_of=self.analytics_date,
+        )
+        self.assertEqual(analytics["target_remaining"], 0)
+        self.assertEqual(analytics["target_progress"], 125)
+        self.assertEqual(analytics["target_progress_bar"], 100)
+
+    def test_milestones_and_next_milestone_are_derived_from_total(self):
+        for _ in range(26):
+            self.create_student(created_at=date(2026, 4, 10))
+
+        analytics = get_student_growth_analytics(
+            self.franchise,
+            as_of=self.analytics_date,
+        )
+
+        self.assertEqual(
+            [item["label"] for item in analytics["reached_milestones"]],
+            ["First Step", "Growing Franchise"],
+        )
+        self.assertEqual(analytics["next_milestone"]["label"], "Rising Star")
+        self.assertEqual(analytics["next_milestone"]["remaining"], 24)
+
+    def test_owner_and_active_staff_only_receive_their_own_franchise_data(self):
+        self.create_student(name="Private Franchise Student")
+        self.create_student(
+            franchise=self.other_franchise,
+            name="Another Franchise Student",
+        )
+
+        with patch(
+            "apps.franchise.analytics.timezone.localdate",
+            return_value=timezone.localdate(),
+        ):
+            self.client.force_login(self.owner)
+            owner_response = self.client.get(
+                reverse("franchise:dashboard"),
+                {"franchise_id": self.other_franchise.pk},
+            )
+            self.assertEqual(owner_response.status_code, 200)
+            self.assertEqual(owner_response.context["stats"]["total_students"], 1)
+            self.assertEqual(owner_response.context["analytics"]["total"], 1)
+            self.assertContains(owner_response, "Monthly Registrations")
+            self.assertContains(owner_response, "student-growth-labels")
+            self.assertContains(owner_response, "studentGrowthChart")
+            self.assertNotContains(owner_response, "Another Franchise Student")
+
+            self.client.force_login(self.staff_user)
+            staff_response = self.client.get(
+                reverse("franchise:staff_dashboard"),
+                {"franchise_id": self.other_franchise.pk},
+            )
+            self.assertEqual(staff_response.status_code, 200)
+            self.assertEqual(staff_response.context["stats"]["total_students"], 1)
+            self.assertEqual(staff_response.context["analytics"]["total"], 1)
+            self.assertContains(staff_response, "Monthly Registrations")
+            self.assertNotContains(staff_response, "Another Franchise Student")
 
 
 class CertificateRequestTests(TestCase):
@@ -580,7 +792,8 @@ class CertificateRequestTests(TestCase):
 
     def test_franchise_login_dashboard_and_homepage_navigation(self):
         home = self.client.get(reverse("core:home"))
-        self.assertNotContains(home, "Franchise Login")
+        self.assertContains(home, "Franchise Login")
+        self.assertContains(home, f'href="{reverse("franchise:login")}"')
         self.assertEqual(self.client.get(reverse("franchise:login")).status_code, 200)
 
         self.client.force_login(self.owner_user)

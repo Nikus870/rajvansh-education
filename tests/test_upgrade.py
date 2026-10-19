@@ -120,10 +120,15 @@ class FranchiseUpgradeIntegrationTests(TestCase):
         )
         self.assertRedirects(response, reverse("franchise:dashboard"))
 
-    def test_homepage_hides_franchise_login_but_other_pages_keep_link(self):
+    def test_homepage_quick_access_and_navbar_franchise_login_visibility(self):
         self.client.force_login(self.admin_user)
         home_response = self.client.get(reverse("core:home"))
-        self.assertNotContains(
+        home_navbar = home_response.content.decode().split("</nav>", 1)[0]
+        self.assertNotIn(
+            f'href="{reverse("franchise:login")}"',
+            home_navbar,
+        )
+        self.assertContains(
             home_response,
             f'href="{reverse("franchise:login")}"',
         )

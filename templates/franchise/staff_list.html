@@ -7,7 +7,7 @@
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
-        <h4 class="mb-1 fw-700" style="color:#0b2450;">Staff Management</h4>
+        <h4 class="mb-1 fw-700">Staff Management</h4>
         <p class="text-muted mb-0 small">Manage your franchise team members</p>
     </div>
     <a href="{% url 'franchise:staff_invite' %}" class="btn btn-primary">
@@ -39,7 +39,7 @@
                         </td>
                         <td>{{ member.email }}</td>
                         <td>
-                            <span class="badge bg-light text-dark border">
+                            <span class="badge-status badge-neutral">
                                 {{ member.get_role_display }}
                             </span>
                         </td>

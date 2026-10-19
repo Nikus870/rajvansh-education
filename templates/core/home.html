@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}
-    {{ site_settings.hero_title }} | {{ site_settings.website_name }}
+    Your Degree, From Anywhere | {{ site_settings.website_name }}
 {% endblock %}
 
 {% block content %}
@@ -18,19 +18,16 @@
             <div class="col-lg-7 hero-copy">
                 <span class="eyebrow hero-eyebrow">Flexible education support</span>
 
-                <h1>{{ site_settings.hero_title }}</h1>
+                <h1>Your Degree, From Anywhere</h1>
 
-                <p>{{ site_settings.hero_subtitle }}</p>
+                <p>Flexible learning. Trusted certificates. A brighter future. Rajvans Group of Educations brings quality education to your doorstep — anytime, anywhere.</p>
 
                 <div class="d-flex flex-wrap gap-3 hero-actions">
                     <a class="btn btn-primary btn-lg" href="{% url 'courses:list' %}">
                         Explore Courses <i class="bi bi-arrow-right"></i>
                     </a>
                     <a class="btn btn-hero-outline btn-lg" href="{% url 'inquiries:consultation' %}">
-                        Career Consultation
-                    </a>
-                    <a class="btn btn-hero-light btn-lg" href="{% url 'inquiries:inquiry' %}">
-                        Enquire Now
+                        Get Guidance
                     </a>
                 </div>
 
@@ -53,21 +50,56 @@
                     <div class="hero-visual-glow"></div>
                     <div class="hero-image-frame">
                         <img
-                            src="{% static 'images/hero-education.svg' %}"
-                            alt="Student learning through modern education"
+                            src="{% static 'images/student-study-hero.webp' %}"
+                            alt="College-age students studying together at laptops in a modern workspace"
                             loading="eager"
                             decoding="async"
                         >
                     </div>
-                    <div class="floating-badge floating-badge-top">
-                        <i class="bi bi-mortarboard-fill"></i>
-                        <span><strong>Learn</strong><small>with confidence</small></span>
-                    </div>
-                    <div class="floating-badge floating-badge-bottom">
-                        <i class="bi bi-graph-up-arrow"></i>
-                        <span><strong>Career focused</strong><small>guided pathways</small></span>
-                    </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ================= QUICK ACCESS ================= -->
+<section class="quick-access-section">
+    <div class="container">
+        <div class="quick-access-heading">
+            <div>
+                <span class="eyebrow">A clear next step</span>
+                <h2>How can we help you today?</h2>
+            </div>
+            <p>Explore learning options, speak with our team, or manage your franchise.</p>
+        </div>
+        <div class="row g-3">
+            <div class="col-sm-6 col-xl-3">
+                <a class="quick-access-card" href="{% url 'courses:list' %}">
+                    <span class="quick-access-icon"><i class="bi bi-journal-bookmark" aria-hidden="true"></i></span>
+                    <span class="quick-access-copy"><strong>Explore Courses</strong><small>Browse available study pathways</small></span>
+                    <i class="bi bi-arrow-up-right quick-access-arrow" aria-hidden="true"></i>
+                </a>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <a class="quick-access-card" href="{% url 'inquiries:consultation' %}">
+                    <span class="quick-access-icon"><i class="bi bi-chat-square-text" aria-hidden="true"></i></span>
+                    <span class="quick-access-copy"><strong>Get Guidance</strong><small>Talk through your education goals</small></span>
+                    <i class="bi bi-arrow-up-right quick-access-arrow" aria-hidden="true"></i>
+                </a>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <a class="quick-access-card" href="{% url 'franchise:login' %}">
+                    <span class="quick-access-icon"><i class="bi bi-building-lock" aria-hidden="true"></i></span>
+                    <span class="quick-access-copy"><strong>Franchise Login</strong><small>Access your franchise workspace</small></span>
+                    <i class="bi bi-arrow-up-right quick-access-arrow" aria-hidden="true"></i>
+                </a>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <a class="quick-access-card" href="{% url 'franchise:register' %}">
+                    <span class="quick-access-icon"><i class="bi bi-person-vcard" aria-hidden="true"></i></span>
+                    <span class="quick-access-copy"><strong>Apply for a Franchise</strong><small>Share your interest with our team</small></span>
+                    <i class="bi bi-arrow-up-right quick-access-arrow" aria-hidden="true"></i>
+                </a>
             </div>
         </div>
     </div>
@@ -184,6 +216,40 @@
         </div>
     </div>
 </section>
+
+{% if testimonials %}
+<section class="section section-soft" aria-labelledby="home-testimonials-title">
+    <div class="container">
+        <div class="section-head" data-reveal>
+            <div>
+                <span class="eyebrow">Student voices</span>
+                <h2 id="home-testimonials-title">Stories from our learners</h2>
+            </div>
+            <a href="{% url 'core:testimonials' %}">Read more <i class="bi bi-arrow-up-right"></i></a>
+        </div>
+        <div class="row g-4">
+            {% for testimonial in testimonials %}
+                <div class="col-md-6 col-lg-4" data-reveal>
+                    <article class="cardx testimonial-card h-100">
+                        <div class="p-4">
+                            <div class="quote" aria-hidden="true">“</div>
+                            <p>{{ testimonial.content }}</p>
+                            <strong>{{ testimonial.student_name }}</strong>
+                            {% if testimonial.course or testimonial.university %}
+                                <small class="d-block">
+                                    {% if testimonial.course %}{{ testimonial.course }}{% endif %}
+                                    {% if testimonial.course and testimonial.university %} · {% endif %}
+                                    {% if testimonial.university %}{{ testimonial.university }}{% endif %}
+                                </small>
+                            {% endif %}
+                        </div>
+                    </article>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
 
 <!-- ================= FAQ ================= -->
 <section class="section faq-section section-light" id="faq">

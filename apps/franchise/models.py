@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -20,6 +21,11 @@ class FranchiseProfile(models.Model):
     state = models.CharField(max_length=100)
     business_name = models.CharField(max_length=180, blank=True)
     address = models.TextField(blank=True)
+    monthly_student_target = models.PositiveIntegerField(
+        default=20,
+        validators=[MinValueValidator(1)],
+        help_text="Monthly new-student registration target for this franchise.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

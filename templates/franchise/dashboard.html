@@ -7,7 +7,7 @@
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
-        <h4 class="mb-1 fw-700" style="color:#0b2450;">
+        <h4 class="mb-1 fw-700">
             Welcome, {{ request.user.first_name|default:request.user.username }}
         </h4>
         <p class="text-muted mb-0 small">
@@ -20,62 +20,91 @@
 </div>
 
 <!-- ── Statistics ───────────────────────────────────────────── -->
-<div class="row g-3 mb-4">
-    <div class="col-6 col-lg-2">
+<div class="row row-cols-2 row-cols-md-3 row-cols-xl-4 g-3 mb-4">
+    <div class="col">
         <div class="stat-card">
-            <div class="stat-icon" style="background:#eaf0ff; color:#1456d9;">
+            <div class="stat-icon">
                 <i class="bi bi-people-fill"></i>
             </div>
             <div class="stat-value">{{ stats.total_students }}</div>
             <div class="stat-label">Total Students</div>
         </div>
     </div>
-    <div class="col-6 col-lg-2">
+    <div class="col">
         <div class="stat-card">
-            <div class="stat-icon" style="background:#e8f5e9; color:#2e7d32;">
+            <div class="stat-icon">
                 <i class="bi bi-calendar-check"></i>
             </div>
             <div class="stat-value">{{ stats.this_month }}</div>
             <div class="stat-label">This Month</div>
         </div>
     </div>
-    <div class="col-6 col-lg-2">
+    <div class="col">
         <div class="stat-card">
-            <div class="stat-icon" style="background:#fff8e1; color:#f57f17;">
+            <div class="stat-icon">
                 <i class="bi bi-hourglass-split"></i>
             </div>
             <div class="stat-value">{{ stats.pending_admissions }}</div>
             <div class="stat-label">Pending Admission</div>
         </div>
     </div>
-    <div class="col-6 col-lg-2">
+    <div class="col">
         <div class="stat-card">
-            <div class="stat-icon" style="background:#e3f2fd; color:#1565c0;">
+            <div class="stat-icon">
                 <i class="bi bi-patch-check"></i>
             </div>
             <div class="stat-value">{{ stats.admitted }}</div>
             <div class="stat-label">Admitted</div>
         </div>
     </div>
-    <div class="col-6 col-lg-2">
+    <div class="col">
         <div class="stat-card">
-            <div class="stat-icon" style="background:#fce4ec; color:#c62828;">
+            <div class="stat-icon">
                 <i class="bi bi-cash-coin"></i>
             </div>
             <div class="stat-value">{{ stats.fee_pending }}</div>
             <div class="stat-label">Fee Pending</div>
         </div>
     </div>
-    <div class="col-6 col-lg-2">
+    <div class="col">
         <div class="stat-card">
-            <div class="stat-icon" style="background:#f3e5f5; color:#7b1fa2;">
+            <div class="stat-icon">
                 <i class="bi bi-person-badge"></i>
             </div>
             <div class="stat-value">{{ stats.staff_count }}</div>
             <div class="stat-label">Active Staff</div>
         </div>
     </div>
+    <div class="col">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-calendar-minus"></i>
+            </div>
+            <div class="stat-value">{{ stats.previous_month }}</div>
+            <div class="stat-label">Previous Month</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-graph-up-arrow"></i>
+            </div>
+            <div class="stat-value">
+                {% if stats.growth_percentage != None %}
+                    {{ stats.growth_percentage|floatformat:1 }}%
+                {% else %}
+                    <span class="small">N/A</span>
+                {% endif %}
+            </div>
+            <div class="stat-label">
+                Month-over-month growth
+                {% if stats.growth_percentage == None %}<span class="d-block">No previous-month baseline</span>{% endif %}
+            </div>
+        </div>
+    </div>
 </div>
+
+{% include 'franchise/_student_growth_analytics.html' %}
 
 <div class="row g-4">
     <!-- ── Recent Students ───────────────────────────────────── -->

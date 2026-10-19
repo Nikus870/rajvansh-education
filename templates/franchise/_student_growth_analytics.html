@@ -1,0 +1,183 @@
+<section class="student-growth-section mb-4" aria-labelledby="student-growth-title">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+            <h5 id="student-growth-title" class="student-growth-title mb-1">
+                <i class="bi bi-graph-up-arrow me-2" aria-hidden="true"></i>Student Growth
+            </h5>
+            <p class="text-muted small mb-0">Track registrations and celebrate your franchise's progress.</p>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-lg-8">
+            <section class="portal-card h-100" aria-labelledby="growth-chart-title">
+                <div class="portal-card-header">
+                    <h5 id="growth-chart-title"><i class="bi bi-bar-chart-line me-2 text-primary" aria-hidden="true"></i>Monthly Registrations</h5>
+                    <span class="small text-muted">Last six months</span>
+                </div>
+                <div class="portal-card-body">
+                    <div class="student-growth-chart">
+                        <canvas id="studentGrowthChart"
+                                role="img"
+                                aria-label="Line chart of new student registrations for each of the last six calendar months, including this month."
+                                aria-describedby="studentGrowthFallback"></canvas>
+                    </div>
+                    <div id="studentGrowthFallback" class="chart-fallback" role="status">
+                        <p class="small text-muted">Monthly registrations:</p>
+                        <ul class="list-inline mb-0">
+                            {% for month in analytics.chart_data %}
+                                <li class="list-inline-item me-3 mb-1">
+                                    <strong>{{ month.label }}:</strong> {{ month.count }}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {{ analytics.chart_labels|json_script:"student-growth-labels" }}
+                    {{ analytics.chart_counts|json_script:"student-growth-counts" }}
+                </div>
+            </section>
+        </div>
+
+        <div class="col-lg-4">
+            <section class="portal-card h-100" aria-labelledby="monthly-target-title">
+                <div class="portal-card-header">
+                    <h5 id="monthly-target-title"><i class="bi bi-bullseye me-2 text-primary" aria-hidden="true"></i>Monthly Student Target</h5>
+                </div>
+                <div class="portal-card-body">
+                    <div class="target-total">{{ analytics.this_month }} <span>/ {{ analytics.target }}</span></div>
+                    <p class="small text-muted mb-3">Registrations this month</p>
+                    <div class="progress student-target-progress"
+                         role="progressbar"
+                         aria-label="Monthly registration target progress"
+                         aria-valuenow="{{ analytics.target_progress_bar }}"
+                         aria-valuemin="0"
+                         aria-valuemax="100">
+                        <div class="progress-bar" style="width: {{ analytics.target_progress_bar }}%"></div>
+                    </div>
+                    <div class="d-flex justify-content-between mt-2 small">
+                        <span>{{ analytics.target_progress }}% of target</span>
+                        <span class="text-muted">{{ analytics.target }} target</span>
+                    </div>
+                    <p class="target-remaining mt-3 mb-0">
+                        {% if analytics.target_remaining %}
+                            <strong>{{ analytics.target_remaining }}</strong> more to reach this month's target
+                        {% else %}
+                            Monthly target reached. Great work!
+                        {% endif %}
+                    </p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <section class="portal-card" aria-labelledby="milestones-title">
+        <div class="portal-card-header">
+            <h5 id="milestones-title"><i class="bi bi-trophy me-2 text-warning" aria-hidden="true"></i>Franchise Milestones</h5>
+            <span class="small text-muted">{{ analytics.total }} students registered</span>
+        </div>
+        <div class="portal-card-body">
+            {% if analytics.reached_milestones %}
+                <div class="d-flex flex-wrap gap-2 mb-3" aria-label="Milestones reached">
+                    {% for milestone in analytics.reached_milestones %}
+                        <span class="badge student-milestone-badge">
+                            <i class="bi bi-award me-1" aria-hidden="true"></i>{{ milestone.label }} · {{ milestone.count }}
+                        </span>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="small text-muted mb-2">Your first milestone is within reach.</p>
+            {% endif %}
+            {% if analytics.next_milestone %}
+                <p class="small mb-0">
+                    Next milestone: <strong>{{ analytics.next_milestone.label }}</strong>
+                    — {{ analytics.next_milestone.remaining }} more
+                    {% if analytics.next_milestone.remaining == 1 %}student{% else %}students{% endif %} to go.
+                </p>
+            {% else %}
+                <p class="small mb-0">All listed milestones reached. Keep growing your student community!</p>
+            {% endif %}
+            <p class="small text-muted mt-2 mb-0">Milestones are motivational indicators only and do not represent official certification or rewards.</p>
+        </div>
+    </section>
+</section>
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+    (function () {
+        const canvas = document.getElementById('studentGrowthChart');
+        const fallback = document.getElementById('studentGrowthFallback');
+        const labelsElement = document.getElementById('student-growth-labels');
+        const countsElement = document.getElementById('student-growth-counts');
+
+        if (!canvas || !fallback || !labelsElement || !countsElement || !window.Chart) {
+            return;
+        }
+
+        const labels = JSON.parse(labelsElement.textContent);
+        const counts = JSON.parse(countsElement.textContent);
+        new window.Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'New student registrations',
+                    data: counts,
+                    borderColor: '#f5b942',
+                    backgroundColor: 'rgba(245, 185, 66, 0.12)',
+                    pointBackgroundColor: '#f5b942',
+                    pointBorderColor: '#121923',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#f5f7fa'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                const count = context.parsed.y;
+                                return count + (count === 1 ? ' student registered' : ' students registered');
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#a7b0be' },
+                        grid: { display: false }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0,
+                            color: '#a7b0be'
+                        },
+                        title: {
+                            display: true,
+                            text: 'New registrations',
+                            color: '#f5f7fa'
+                        },
+                        grid: { color: '#273241' }
+                    }
+                }
+            }
+        });
+        fallback.hidden = true;
+    }());
+</script>
+{% endblock %}

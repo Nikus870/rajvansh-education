@@ -10,7 +10,7 @@
 {% block content %}
 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
     <div>
-        <h4 class="mb-1 fw-700" style="color:#0b2450;">Student Records</h4>
+        <h4 class="mb-1 fw-700">Student Records</h4>
         <p class="text-muted mb-0 small">
             {% if is_admin_view %}
                 Parent Admin View: Showing students across all franchises (Total: {{ total }})
@@ -104,7 +104,7 @@
                                 </a>
                             </td>
                             <td>
-                                <strong style="color:#0b2450;">{{ student.full_name }}</strong>
+                                <strong>{{ student.full_name }}</strong>
                                 {% if student.guardian_name %}
                                     <div class="text-muted" style="font-size: 0.75rem;">S/D/W of {{ student.guardian_name }}</div>
                                 {% endif %}
