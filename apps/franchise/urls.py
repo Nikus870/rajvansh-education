@@ -21,6 +21,11 @@ urlpatterns = [
     # Course certificate requests
     path("certificates/", certificate_views.certificate_requests, name="certificate_requests"),
     path(
+        "certificates/request/",
+        certificate_views.certificate_request_select,
+        name="certificate_request_select",
+    ),
+    path(
         "certificates/request/<int:student_id>/",
         certificate_views.certificate_request_create,
         name="certificate_request_create",

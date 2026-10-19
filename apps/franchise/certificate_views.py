@@ -5,18 +5,44 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET
 
 from apps.students.models import Student
 from apps.students.views import get_franchise_profile
 
-from .forms import CertificateRequestConfirmForm
+from .forms import CertificateRequestConfirmForm, CertificateStudentSelectionForm
 from .models import CertificateRequest
 from .views import portal_required
 
 logger = logging.getLogger(__name__)
+
+
+@portal_required
+def certificate_request_select(request):
+    franchise = get_franchise_profile(request.user)
+    if franchise is None:
+        raise PermissionDenied
+
+    form = CertificateStudentSelectionForm(
+        request.POST or None,
+        franchise=franchise,
+    )
+    if request.method == "POST" and form.is_valid():
+        return redirect(
+            "franchise:certificate_request_create",
+            student_id=form.cleaned_data["student"].pk,
+        )
+    return render(
+        request,
+        "franchise/certificate_student_select.html",
+        {
+            "form": form,
+            "has_students": form.fields["student"].queryset.exists(),
+        },
+    )
 
 
 @portal_required
@@ -71,34 +97,89 @@ def certificate_request_create(request, student_id):
         pk=student_id,
         franchise=franchise,
     )
-    open_request = CertificateRequest.objects.filter(student=student).filter(
+    existing_request = CertificateRequest.objects.filter(student=student).filter(
         Q(status=CertificateRequest.STATUS_PENDING)
         | Q(status=CertificateRequest.STATUS_APPROVED, is_revoked=False)
-    ).exists()
+    ).first()
     form = CertificateRequestConfirmForm(request.POST or None)
 
     if request.method == "POST" and form.is_valid():
-        if open_request:
+        if existing_request:
             messages.warning(
                 request,
-                "A pending request or active certificate already exists for this student.",
+                "This student already has a pending request or an active certificate.",
             )
-            return redirect("franchise:certificate_requests")
+            return redirect(
+                f"{reverse('franchise:certificate_requests')}#certificate-request-{existing_request.pk}"
+            )
         try:
             with transaction.atomic():
-                CertificateRequest.objects.create(
+                created_request = CertificateRequest.objects.create(
                     student=student,
                     franchise=franchise,
                     requested_by=request.user,
                 )
         except IntegrityError:
-            messages.warning(
+            existing_request = CertificateRequest.objects.filter(student=student).filter(
+                Q(status=CertificateRequest.STATUS_PENDING)
+                | Q(status=CertificateRequest.STATUS_APPROVED, is_revoked=False)
+            ).first()
+            if existing_request and existing_request.status == CertificateRequest.STATUS_PENDING:
+                messages.warning(request, "A pending request already exists for this student.")
+                return redirect(
+                    f"{reverse('franchise:certificate_requests')}#certificate-request-{existing_request.pk}"
+                )
+            if existing_request:
+                messages.warning(request, "An active certificate already exists for this student.")
+                return redirect(
+                    f"{reverse('franchise:certificate_requests')}#certificate-request-{existing_request.pk}"
+                )
+            logger.exception(
+                "Certificate request database integrity failure for student ID %s and franchise ID %s.",
+                student.pk,
+                franchise.pk,
+            )
+            form.add_error(
+                None,
+                "We could not save this request because of a database issue. Please try again or contact support.",
+            )
+            return render(
                 request,
-                "A pending request or active certificate already exists for this student.",
+                "franchise/certificate_request_confirm.html",
+                {
+                    "student": student,
+                    "form": form,
+                    "existing_request": None,
+                },
+                status=503,
+            )
+        except Exception:
+            logger.exception(
+                "Certificate request creation failed for student ID %s and franchise ID %s.",
+                student.pk,
+                franchise.pk,
+            )
+            form.add_error(
+                None,
+                "We could not save this request right now. Please try again or contact support if the problem continues.",
+            )
+            return render(
+                request,
+                "franchise/certificate_request_confirm.html",
+                {
+                    "student": student,
+                    "form": form,
+                    "existing_request": None,
+                },
+                status=503,
             )
         else:
             messages.success(request, "Certificate request submitted for superuser review.")
-        return redirect("franchise:certificate_requests")
+            return render(
+                request,
+                "franchise/certificate_request_submitted.html",
+                {"certificate_request": created_request},
+            )
 
     return render(
         request,
@@ -106,7 +187,7 @@ def certificate_request_create(request, student_id):
         {
             "student": student,
             "form": form,
-            "already_requested": open_request,
+            "existing_request": existing_request,
         },
     )
 
@@ -120,12 +201,16 @@ def _certificate_file_response(certificate_request, *, attachment=True):
         raise Http404
     try:
         file_obj = certificate_request.certificate_file.open("rb")
-    except (FileNotFoundError, OSError):
+    except Exception:
         logger.exception(
             "Certificate file is missing or inaccessible for request ID %s.",
             certificate_request.pk,
         )
-        raise Http404("Certificate file is unavailable.")
+        return HttpResponse(
+            "The certificate is temporarily unavailable. Please try again later.",
+            status=503,
+            content_type="text/plain",
+        )
     return FileResponse(
         file_obj,
         as_attachment=attachment,

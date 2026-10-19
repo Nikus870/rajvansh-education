@@ -7,7 +7,32 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.db.models import Q
 
+from apps.students.models import Student
+
 from .models import FranchiseApplication, FranchiseStaff
+
+
+class CertificateStudentSelectionForm(forms.Form):
+    student = forms.ModelChoiceField(
+        queryset=Student.objects.none(),
+        label="Student",
+        empty_label="Choose a student",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
+    def __init__(self, *args, franchise, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["student"].queryset = (
+            Student.objects.filter(franchise=franchise)
+            .select_related("course")
+            .order_by("full_name", "registration_number")
+        )
+        self.fields["student"].label_from_instance = (
+            lambda student: (
+                f"{student.full_name} — {student.registration_number} — "
+                f"{student.course.name}"
+            )
+        )
 
 
 class FranchiseRegistrationForm(forms.ModelForm):

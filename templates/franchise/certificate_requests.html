@@ -44,7 +44,7 @@
                     </thead>
                     <tbody>
                         {% for student in student_results %}
-                            <tr>
+                            <tr id="certificate-request-{{ item.pk }}">
                                 <td>{{ student.full_name }}</td>
                                 <td><code>{{ student.registration_number }}</code></td>
                                 <td>{{ student.course.name }}</td>
@@ -102,7 +102,7 @@
                 </thead>
                 <tbody>
                     {% for item in history %}
-                        <tr>
+                        <tr id="certificate-request-{{ item.pk }}">
                             <td>{{ item.student.full_name }}</td>
                             <td><code>{{ item.student.registration_number }}</code></td>
                             <td>{{ item.student.course.name }}<br><small class="text-muted">{{ item.student.university.name|default:"—" }}</small></td>

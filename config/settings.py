@@ -302,14 +302,35 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # =========================================================
 
 MEDIA_URL = "/media/"
+CERTIFICATE_STORAGE_BACKEND = os.getenv(
+    "CERTIFICATE_STORAGE_BACKEND",
+    "apps.franchise.certificate_storage.PrivateCertificateStorage",
+).strip()
 CERTIFICATE_STORAGE_ROOT_ENV = os.getenv("CERTIFICATE_STORAGE_ROOT", "").strip()
-if not (DEBUG or TESTING) and not CERTIFICATE_STORAGE_ROOT_ENV:
+if (
+    not (DEBUG or TESTING)
+    and CERTIFICATE_STORAGE_BACKEND
+    == "apps.franchise.certificate_storage.PrivateCertificateStorage"
+    and not CERTIFICATE_STORAGE_ROOT_ENV
+):
     raise ImproperlyConfigured(
         "CERTIFICATE_STORAGE_ROOT must point to durable, private certificate storage."
     )
 CERTIFICATE_STORAGE_ROOT = Path(
     CERTIFICATE_STORAGE_ROOT_ENV or BASE_DIR / "private-certificates"
 ).resolve()
+try:
+    CERTIFICATE_STORAGE_OPTIONS = json.loads(
+        os.getenv("CERTIFICATE_STORAGE_OPTIONS", "{}")
+    )
+except json.JSONDecodeError as exc:
+    raise ImproperlyConfigured(
+        "CERTIFICATE_STORAGE_OPTIONS must be valid JSON."
+    ) from exc
+if not isinstance(CERTIFICATE_STORAGE_OPTIONS, dict):
+    raise ImproperlyConfigured(
+        "CERTIFICATE_STORAGE_OPTIONS must be a JSON object."
+    )
 
 MEDIA_ROOT_ENV = os.getenv("MEDIA_ROOT", "").strip()
 
@@ -331,7 +352,11 @@ else:
             "MEDIA_ROOT must be an absolute directory path."
         )
 
-if not (DEBUG or TESTING):
+if (
+    not (DEBUG or TESTING)
+    and CERTIFICATE_STORAGE_BACKEND
+    == "apps.franchise.certificate_storage.PrivateCertificateStorage"
+):
     try:
         CERTIFICATE_STORAGE_ROOT.relative_to(MEDIA_ROOT.resolve())
     except ValueError:

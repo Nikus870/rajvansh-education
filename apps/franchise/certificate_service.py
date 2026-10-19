@@ -122,7 +122,11 @@ def generate_certificate_pdf(certificate_request, verification_url):
 
 
 def approve_certificate_request(certificate_request_id, reviewer, verification_url):
-    if not reviewer.is_authenticated or not reviewer.is_superuser:
+    if (
+        not reviewer.is_authenticated
+        or not reviewer.is_active
+        or not reviewer.is_superuser
+    ):
         raise PermissionError("Only a superuser may approve certificate requests.")
 
     stored_name = None
@@ -182,13 +186,23 @@ def approve_certificate_request(certificate_request_id, reviewer, verification_u
     except Exception:
         if stored_name:
             storage = CertificateRequest._meta.get_field("certificate_file").storage
-            if storage.exists(stored_name):
-                storage.delete(stored_name)
+            try:
+                if storage.exists(stored_name):
+                    storage.delete(stored_name)
+            except Exception:
+                logger.exception(
+                    "Could not remove incomplete certificate file %s after approval failed.",
+                    stored_name,
+                )
         raise
 
 
 def reject_certificate_request(certificate_request_id, reviewer):
-    if not reviewer.is_authenticated or not reviewer.is_superuser:
+    if (
+        not reviewer.is_authenticated
+        or not reviewer.is_active
+        or not reviewer.is_superuser
+    ):
         raise PermissionError("Only a superuser may reject certificate requests.")
 
     with transaction.atomic():
@@ -202,5 +216,31 @@ def reject_certificate_request(certificate_request_id, reviewer):
         certificate_request.reviewed_at = timezone.now()
         certificate_request.save(
             update_fields=("status", "reviewed_by", "reviewed_at")
+        )
+        return certificate_request
+
+
+def revoke_certificate_request(certificate_request_id, reviewer):
+    if (
+        not reviewer.is_authenticated
+        or not reviewer.is_active
+        or not reviewer.is_superuser
+    ):
+        raise PermissionError("Only a superuser may revoke certificates.")
+
+    with transaction.atomic():
+        certificate_request = CertificateRequest.objects.select_for_update().get(
+            pk=certificate_request_id
+        )
+        if (
+            certificate_request.status != CertificateRequest.STATUS_APPROVED
+            or certificate_request.is_revoked
+        ):
+            raise ValueError("Only an active approved certificate can be revoked.")
+        certificate_request.is_revoked = True
+        certificate_request.revoked_by = reviewer
+        certificate_request.revoked_at = timezone.now()
+        certificate_request.save(
+            update_fields=("is_revoked", "revoked_by", "revoked_at")
         )
         return certificate_request

@@ -244,6 +244,14 @@ class CertificateRequest(models.Model):
         editable=False,
     )
     is_revoked = models.BooleanField(default=False)
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="revoked_certificate_requests",
+    )
+    revoked_at = models.DateTimeField(null=True, blank=True)
     certificate_file = models.FileField(
         upload_to="",
         storage=get_certificate_storage,

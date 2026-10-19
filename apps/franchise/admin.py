@@ -7,9 +7,13 @@ from django.contrib import admin, messages
 from django.contrib.auth.models import User
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 
-from .certificate_service import approve_certificate_request, reject_certificate_request
+from .certificate_service import (
+    approve_certificate_request,
+    reject_certificate_request,
+    revoke_certificate_request,
+)
 from .certificate_views import admin_certificate_download
 from .models import (
     CertificateRequest,
@@ -445,6 +449,7 @@ class CertificateRequestAdmin(admin.ModelAdmin):
         "requested_at",
         "certificate_number",
         "is_revoked",
+        "revoked_at",
     )
     list_filter = (
         "status",
@@ -470,6 +475,7 @@ class CertificateRequestAdmin(admin.ModelAdmin):
         "course_name",
         "institution_name",
         "study_mode",
+        "prior_requests",
         "franchise",
         "requested_by",
         "requested_at",
@@ -480,6 +486,8 @@ class CertificateRequestAdmin(admin.ModelAdmin):
         "issued_at",
         "verification_token",
         "is_revoked",
+        "revoked_by",
+        "revoked_at",
         "certificate_download_link",
     )
     fieldsets = (
@@ -493,6 +501,7 @@ class CertificateRequestAdmin(admin.ModelAdmin):
                     "course_name",
                     "institution_name",
                     "study_mode",
+                    "prior_requests",
                     "franchise",
                     "requested_by",
                     "requested_at",
@@ -519,6 +528,8 @@ class CertificateRequestAdmin(admin.ModelAdmin):
                     "certificate_number",
                     "issued_at",
                     "is_revoked",
+                    "revoked_by",
+                    "revoked_at",
                     "certificate_download_link",
                 )
             },
@@ -549,6 +560,39 @@ class CertificateRequestAdmin(admin.ModelAdmin):
     @admin.display(description="Study mode")
     def study_mode(self, obj):
         return obj.student.get_study_mode_display()
+
+    @admin.display(description="Previous certificate requests")
+    def prior_requests(self, obj):
+        previous = (
+            CertificateRequest.objects.filter(student_id=obj.student_id)
+            .exclude(pk=obj.pk)
+            .order_by("-requested_at")
+        )
+        if not previous.exists():
+            return "No previous requests"
+        return format_html(
+            "<ul>{}</ul>",
+            format_html_join(
+                "",
+                '<li><a href="{}">{}</a> — {}{}</li>',
+                (
+                    (
+                        reverse(
+                            "admin:franchise_certificaterequest_change",
+                            args=(item.pk,),
+                        ),
+                        item.requested_at.strftime("%d %b %Y"),
+                        item.get_status_display(),
+                        (
+                            f" — {item.certificate_number}"
+                            if item.certificate_number
+                            else ""
+                        ),
+                    )
+                    for item in previous
+                ),
+            ),
+        )
 
     @admin.display(description="Generated certificate")
     def certificate_download_link(self, obj):
@@ -659,12 +703,29 @@ class CertificateRequestAdmin(admin.ModelAdmin):
     def revoke_certificates(self, request, queryset):
         if not self._require_superuser(request):
             return
-        updated = queryset.filter(
-            status=CertificateRequest.STATUS_APPROVED,
-            is_revoked=False,
-        ).update(is_revoked=True)
-        self.message_user(
-            request,
-            f"{updated} certificate(s) revoked.",
-            level=messages.WARNING,
-        )
+        revoked = 0
+        failed = 0
+        for certificate_request in queryset:
+            try:
+                revoke_certificate_request(certificate_request.pk, request.user)
+            except (PermissionError, ValueError) as error:
+                failed += 1
+                self.message_user(
+                    request,
+                    f"Request {certificate_request.pk} was not revoked: {error}",
+                    level=messages.WARNING,
+                )
+            else:
+                revoked += 1
+        if revoked:
+            self.message_user(
+                request,
+                f"{revoked} certificate(s) revoked.",
+                level=messages.WARNING,
+            )
+        if failed:
+            self.message_user(
+                request,
+                f"{failed} certificate(s) were not revoked.",
+                level=messages.WARNING,
+            )

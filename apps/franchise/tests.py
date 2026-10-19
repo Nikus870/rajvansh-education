@@ -1,8 +1,10 @@
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
+from django.core.files.storage import InMemoryStorage
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from pypdf import PdfReader
 
@@ -10,7 +12,9 @@ from apps.courses.models import Course, CourseCategory
 from apps.franchise.certificate_service import (
     approve_certificate_request,
     reject_certificate_request,
+    revoke_certificate_request,
 )
+from apps.franchise.certificate_storage import PrivateStorageProxy, get_certificate_storage
 from apps.franchise.models import (
     CertificateRequest,
     FranchiseProfile,
@@ -135,6 +139,78 @@ class CertificateRequestTests(TestCase):
         response = self.client.get(reverse("franchise:certificate_requests"))
         self.assertEqual(response.status_code, 200)
 
+    def test_existing_student_picker_lists_only_authenticated_franchise_students(self):
+        other_user = User.objects.create_user(
+            username="other-picker-owner",
+            password="StrongPass123!",
+        )
+        other_franchise = FranchiseProfile.objects.create(
+            user=other_user,
+            mobile="9999999994",
+            city="Ajmer",
+            state="Rajasthan",
+        )
+        other_student = self.create_student(
+            other_franchise,
+            other_user,
+            "Private Other Student",
+            "RG-CERT-STUDENT-PICKER",
+        )
+        self.client.force_login(self.owner_user)
+        response = self.client.get(reverse("franchise:certificate_request_select"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.student.registration_number)
+        self.assertNotContains(response, other_student.registration_number)
+
+        response = self.client.post(
+            reverse("franchise:certificate_request_select"),
+            {"student": other_student.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Select a valid choice")
+
+    def test_existing_student_selection_continues_to_review(self):
+        self.request.delete()
+        self.client.force_login(self.staff_user)
+        response = self.client.post(
+            reverse("franchise:certificate_request_select"),
+            {"student": self.student.pk},
+        )
+        self.assertRedirects(
+            response,
+            reverse(
+                "franchise:certificate_request_create",
+                args=(self.student.pk,),
+            ),
+        )
+        review = self.client.get(response.url)
+        self.assertEqual(review.status_code, 200)
+        self.assertContains(review, self.student.registration_number)
+
+    def test_add_student_reuses_registration_form_and_returns_to_certificate_review(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.post(
+            f"{reverse('students:register')}?next=certificate_request",
+            {
+                "full_name": "New Certificate Student",
+                "mobile": "9999999876",
+                "course": self.course.pk,
+                "university": self.university.pk,
+                "study_mode": "odl",
+                "admission_status": "enrolled",
+                "fee_status": "pending",
+            },
+        )
+        student = Student.objects.get(full_name="New Certificate Student")
+        self.assertEqual(student.franchise, self.franchise)
+        self.assertEqual(student.created_by, self.owner_user)
+        self.assertRedirects(
+            response,
+            reverse("franchise:certificate_request_create", args=(student.pk,)),
+        )
+        self.assertFalse(CertificateRequest.objects.filter(student=student).exists())
+        self.assertEqual(self.client.get(response.url).status_code, 200)
+
     def test_franchise_cannot_request_another_franchises_student(self):
         other_user = User.objects.create_user(
             username="other-owner",
@@ -171,13 +247,37 @@ class CertificateRequestTests(TestCase):
             ),
             {"confirm": "on"},
         )
-        self.assertRedirects(response, reverse("franchise:certificate_requests"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Request submitted for review")
+        self.assertContains(response, "does not confirm course completion")
         request = CertificateRequest.objects.get(
             student=self.student,
             status=CertificateRequest.STATUS_PENDING,
         )
         self.assertEqual(request.franchise, self.franchise)
         self.assertEqual(request.requested_by, self.staff_user)
+
+    def test_request_creation_database_error_shows_safe_message(self):
+        self.request.delete()
+        self.client.force_login(self.owner_user)
+        with patch(
+            "apps.franchise.certificate_views.CertificateRequest.objects.create",
+            side_effect=OSError("database details must not reach the response"),
+        ):
+            response = self.client.post(
+                reverse(
+                    "franchise:certificate_request_create",
+                    args=(self.student.pk,),
+                ),
+                {"confirm": "on"},
+            )
+        self.assertEqual(response.status_code, 503)
+        self.assertContains(
+            response,
+            "We could not save this request right now",
+            status_code=503,
+        )
+        self.assertNotContains(response, "database details", status_code=503)
 
     def test_duplicate_pending_requests_are_prevented_by_database_constraint(self):
         with self.assertRaises(IntegrityError):
@@ -187,6 +287,29 @@ class CertificateRequestTests(TestCase):
                     franchise=self.franchise,
                     requested_by=self.owner_user,
                 )
+
+    def test_duplicate_submission_links_to_existing_request(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.post(
+            reverse(
+                "franchise:certificate_request_create",
+                args=(self.student.pk,),
+            ),
+            {"confirm": "on"},
+        )
+        self.assertRedirects(
+            response,
+            f"{reverse('franchise:certificate_requests')}#certificate-request-{self.request.pk}",
+        )
+        self.assertEqual(
+            CertificateRequest.objects.filter(
+                student=self.student,
+                status=CertificateRequest.STATUS_PENDING,
+            ).count(),
+            1,
+        )
+        history = self.client.get(reverse("franchise:certificate_requests"))
+        self.assertContains(history, f'id="certificate-request-{self.request.pk}"')
 
     def test_franchise_user_cannot_approve_a_request(self):
         with self.assertRaises(PermissionError):
@@ -317,8 +440,9 @@ class CertificateRequestTests(TestCase):
         self.assertContains(verified, approved.certificate_number)
         self.assertNotContains(verified, self.franchise.business_name)
 
-        approved.is_revoked = True
-        approved.save(update_fields=("is_revoked",))
+        approved = revoke_certificate_request(approved.pk, self.admin_user)
+        self.assertEqual(approved.revoked_by, self.admin_user)
+        self.assertIsNotNone(approved.revoked_at)
         self.assertEqual(
             self.client.get(
                 reverse("franchise:certificate_download", args=(approved.pk,))
@@ -355,6 +479,58 @@ class CertificateRequestTests(TestCase):
         self.assertIsNone(self.request.certificate_number)
         self.assertIsNone(self.request.reviewed_at)
 
+    def test_storage_save_failure_keeps_request_pending(self):
+        self.request.eligibility_verified = True
+        self.request.eligibility_remarks = "Verified against the completion record."
+        self.request.save(
+            update_fields=("eligibility_verified", "eligibility_remarks")
+        )
+        storage = CertificateRequest._meta.get_field("certificate_file").storage
+        with patch.object(storage, "_save", side_effect=OSError("storage unavailable")):
+            with self.assertRaises(OSError):
+                approve_certificate_request(
+                    self.request.pk,
+                    self.admin_user,
+                    lambda token: "/verify/",
+                )
+        self.request.refresh_from_db()
+        self.assertEqual(self.request.status, CertificateRequest.STATUS_PENDING)
+        self.assertFalse(self.request.certificate_file)
+        self.assertIsNone(self.request.certificate_number)
+
+    def test_storage_read_failure_returns_safe_temporary_error(self):
+        approved = self.approve(self.request)
+        self.client.force_login(self.owner_user)
+        with patch.object(
+            approved.certificate_file.storage,
+            "open",
+            side_effect=OSError("storage credentials"),
+        ):
+            response = self.client.get(
+                reverse("franchise:certificate_download", args=(approved.pk,))
+            )
+        self.assertEqual(response.status_code, 503)
+        self.assertContains(
+            response,
+            "temporarily unavailable",
+            status_code=503,
+        )
+        self.assertNotContains(response, "storage credentials", status_code=503)
+
+    @override_settings(
+        CERTIFICATE_STORAGE_BACKEND="django.core.files.storage.InMemoryStorage",
+        CERTIFICATE_STORAGE_OPTIONS={},
+    )
+    def test_configured_storage_backend_remains_private(self):
+        storage = get_certificate_storage()
+        self.assertIsInstance(storage, PrivateStorageProxy)
+        stored_name = storage.save("certificate.pdf", ContentFile(b"%PDF-test"))
+        self.addCleanup(storage.delete, stored_name)
+        with storage.open(stored_name, "rb") as certificate_file:
+            self.assertEqual(certificate_file.read(), b"%PDF-test")
+        with self.assertRaises(ValueError):
+            storage.url(stored_name)
+
     def test_approved_requests_prevent_another_active_certificate(self):
         approved = self.approve(self.request)
         with self.assertRaises(IntegrityError):
@@ -364,8 +540,7 @@ class CertificateRequestTests(TestCase):
                     franchise=self.franchise,
                     status=CertificateRequest.STATUS_APPROVED,
                 )
-        approved.is_revoked = True
-        approved.save(update_fields=("is_revoked",))
+        revoke_certificate_request(approved.pk, self.admin_user)
         replacement = CertificateRequest.objects.create(
             student=self.student,
             franchise=self.franchise,
@@ -430,7 +605,25 @@ class CertificateRequestTests(TestCase):
             f"/admin/franchise/certificaterequest/{self.request.pk}/change/"
         )
         self.assertEqual(detail.status_code, 200)
-        approved = self.approve(self.request)
+        self.assertContains(detail, "Eligibility verified")
+        self.request.eligibility_verified = True
+        self.request.eligibility_remarks = "Verified against official completion evidence."
+        self.request.save(
+            update_fields=("eligibility_verified", "eligibility_remarks")
+        )
+        response = self.client.post(
+            reverse("admin:franchise_certificaterequest_changelist"),
+            {
+                "action": "approve_requests",
+                "_selected_action": [str(self.request.pk)],
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.request.refresh_from_db()
+        self.assertEqual(self.request.status, CertificateRequest.STATUS_APPROVED)
+        approved = self.request
+        self.created_certificate_names.append(approved.certificate_file.name)
         download = self.client.get(
             reverse(
                 "admin:franchise_certificaterequest_download_certificate",
@@ -439,3 +632,25 @@ class CertificateRequestTests(TestCase):
         )
         self.assertEqual(download.status_code, 200)
         download.close()
+        response = self.client.post(
+            reverse("admin:franchise_certificaterequest_changelist"),
+            {
+                "action": "revoke_certificates",
+                "_selected_action": [str(approved.pk)],
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        approved.refresh_from_db()
+        self.assertTrue(approved.is_revoked)
+        self.assertEqual(approved.revoked_by, self.admin_user)
+        self.assertIsNotNone(approved.revoked_at)
+        self.assertEqual(
+            self.client.get(
+                reverse(
+                    "admin:franchise_certificaterequest_download_certificate",
+                    args=(approved.pk,),
+                )
+            ).status_code,
+            404,
+        )
