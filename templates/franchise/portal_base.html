@@ -265,6 +265,8 @@
         }
 
         .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-approved { background: #d1e7dd; color: #0f5132; }
+        .badge-rejected { background: #f8d7da; color: #842029; }
         .badge-admitted, .badge-enrolled { background: #d1e7dd; color: #0f5132; }
         .badge-rejected, .badge-cancelled { background: #f8d7da; color: #842029; }
         .badge-paid { background: #d1e7dd; color: #0f5132; }
@@ -392,6 +394,10 @@
                class="portal-nav-link {% block nav_students %}{% endblock %}">
                 <i class="bi bi-people"></i> All Students
             </a>
+            <a href="{% url 'franchise:certificate_requests' %}"
+               class="portal-nav-link {% block nav_certificates %}{% endblock %}">
+                <i class="bi bi-award"></i> Course Certificates
+            </a>
 
             <span class="portal-nav-section mt-2">Management</span>
             <a href="{% url 'franchise:staff_list' %}"
@@ -426,6 +432,10 @@
             <a href="{% url 'students:list' %}"
                class="portal-nav-link {% block nav_staff_students %}{% endblock %}">
                 <i class="bi bi-people"></i> Students
+            </a>
+            <a href="{% url 'franchise:certificate_requests' %}"
+               class="portal-nav-link {% block nav_staff_certificates %}{% endblock %}">
+                <i class="bi bi-award"></i> Course Certificates
             </a>
             <span class="portal-nav-section mt-2">Account</span>
             <a href="{% url 'franchise:change_password' %}"

@@ -1,0 +1,46 @@
+{% extends 'franchise/portal_base.html' %}
+
+{% block title %}Review Certificate Request{% endblock %}
+{% block breadcrumb %}<span class="separator">/</span> <a href="{% url 'franchise:certificate_requests' %}">Course Certificates</a><span class="separator">/</span> Review{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h4 class="mb-1 fw-700" style="color:#0b2450;">Review student details</h4>
+    <p class="text-muted mb-0 small">Confirm the information before sending this request to the superuser for eligibility review.</p>
+</div>
+
+<div class="portal-card">
+    <div class="portal-card-header">
+        <h5><i class="bi bi-mortarboard me-2 text-primary"></i>Certificate request details</h5>
+    </div>
+    <div class="portal-card-body">
+        <dl class="row mb-4">
+            <dt class="col-sm-4">Student name</dt><dd class="col-sm-8">{{ student.full_name }}</dd>
+            <dt class="col-sm-4">Registration number</dt><dd class="col-sm-8"><code>{{ student.registration_number }}</code></dd>
+            <dt class="col-sm-4">Course name</dt><dd class="col-sm-8">{{ student.course.name }}</dd>
+            <dt class="col-sm-4">University / Institution</dt><dd class="col-sm-8">{{ student.university.name|default:"—" }}</dd>
+            <dt class="col-sm-4">Study mode</dt><dd class="col-sm-8">{{ student.get_study_mode_display }}</dd>
+            <dt class="col-sm-4">Franchise</dt><dd class="col-sm-8">{{ student.franchise.business_name|default:student.franchise }}</dd>
+        </dl>
+
+        <div class="alert alert-info">
+            Submitting a request does not confirm course completion. A superuser must independently verify eligibility before a certificate can be issued.
+        </div>
+        {% if already_requested %}
+            <div class="alert alert-warning">A pending request or active certificate already exists for this student.</div>
+        {% else %}
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-check mb-3">
+                    {{ form.confirm }}
+                    <label class="form-check-label" for="{{ form.confirm.id_for_label }}">{{ form.confirm.label }}</label>
+                    {% for error in form.confirm.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                {% for error in form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+                <button type="submit" class="btn btn-primary">Submit Certificate Request</button>
+                <a href="{% url 'franchise:certificate_requests' %}" class="btn btn-outline-secondary">Cancel</a>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

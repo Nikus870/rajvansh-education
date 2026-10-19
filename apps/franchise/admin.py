@@ -5,10 +5,14 @@ import resend
 from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.auth.models import User
-from django.urls import reverse
+from django.urls import path, reverse
 from django.utils import timezone
+from django.utils.html import format_html
 
+from .certificate_service import approve_certificate_request, reject_certificate_request
+from .certificate_views import admin_certificate_download
 from .models import (
+    CertificateRequest,
     FranchiseActivationToken,
     FranchiseApplication,
     FranchiseProfile,
@@ -51,7 +55,7 @@ Please use the link below to activate your account and create your password:
 
 {activation_url}
 
-This link is valid for 24 hours.
+This link is valid for 10 minutes.
 
 Regards,
 Rajvansh Group of Educations
@@ -428,3 +432,239 @@ class FranchiseStaffInvitationAdmin(admin.ModelAdmin):
         "staff__email",
         "staff__name",
     )
+
+
+@admin.register(CertificateRequest)
+class CertificateRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "student",
+        "course_name",
+        "franchise",
+        "status",
+        "eligibility_verified",
+        "requested_at",
+        "certificate_number",
+        "is_revoked",
+    )
+    list_filter = (
+        "status",
+        "student__course",
+        "franchise",
+        "requested_at",
+        "is_revoked",
+    )
+    search_fields = (
+        "student__full_name",
+        "student__registration_number",
+        "certificate_number",
+        "franchise__business_name",
+        "franchise__user__username",
+        "franchise__user__email",
+    )
+    date_hierarchy = "requested_at"
+    raw_id_fields = ("student", "franchise", "requested_by", "reviewed_by")
+    readonly_fields = (
+        "student",
+        "student_registration_number",
+        "student_full_name",
+        "course_name",
+        "institution_name",
+        "study_mode",
+        "franchise",
+        "requested_by",
+        "requested_at",
+        "status",
+        "reviewed_by",
+        "reviewed_at",
+        "certificate_number",
+        "issued_at",
+        "verification_token",
+        "is_revoked",
+        "certificate_download_link",
+    )
+    fieldsets = (
+        (
+            "Request",
+            {
+                "fields": (
+                    "student",
+                    "student_registration_number",
+                    "student_full_name",
+                    "course_name",
+                    "institution_name",
+                    "study_mode",
+                    "franchise",
+                    "requested_by",
+                    "requested_at",
+                    "status",
+                )
+            },
+        ),
+        (
+            "Eligibility and remarks",
+            {
+                "fields": (
+                    "eligibility_verified",
+                    "eligibility_remarks",
+                    "admin_remarks",
+                )
+            },
+        ),
+        (
+            "Certificate",
+            {
+                "fields": (
+                    "reviewed_by",
+                    "reviewed_at",
+                    "certificate_number",
+                    "issued_at",
+                    "is_revoked",
+                    "certificate_download_link",
+                )
+            },
+        ),
+    )
+    actions = (
+        "approve_requests",
+        "reject_requests",
+        "revoke_certificates",
+    )
+
+    @admin.display(description="Course")
+    def course_name(self, obj):
+        return obj.student.course.name
+
+    @admin.display(description="Student name")
+    def student_full_name(self, obj):
+        return obj.student.full_name
+
+    @admin.display(description="Registration number")
+    def student_registration_number(self, obj):
+        return obj.student.registration_number
+
+    @admin.display(description="Institution")
+    def institution_name(self, obj):
+        return obj.student.university.name if obj.student.university_id else "—"
+
+    @admin.display(description="Study mode")
+    def study_mode(self, obj):
+        return obj.student.get_study_mode_display()
+
+    @admin.display(description="Generated certificate")
+    def certificate_download_link(self, obj):
+        if (
+            obj.status != CertificateRequest.STATUS_APPROVED
+            or obj.is_revoked
+            or not obj.certificate_file
+        ):
+            return "No available certificate"
+        url = reverse(
+            "admin:franchise_certificaterequest_download_certificate",
+            args=(obj.pk,),
+        )
+        return format_html('<a href="{}">Download certificate PDF</a>', url)
+
+    def get_urls(self):
+        custom_urls = [
+            path(
+                "<int:request_id>/download-certificate/",
+                self.admin_site.admin_view(admin_certificate_download),
+                name="franchise_certificaterequest_download_certificate",
+            )
+        ]
+        return custom_urls + super().get_urls()
+
+    def _require_superuser(self, request):
+        if request.user.is_active and request.user.is_superuser:
+            return True
+        self.message_user(
+            request,
+            "Only an active superuser may review certificate requests.",
+            level=messages.ERROR,
+        )
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.action(description="Approve selected verified certificate requests")
+    def approve_requests(self, request, queryset):
+        if not self._require_superuser(request):
+            return
+
+        approved = 0
+        failed = 0
+        for certificate_request in queryset:
+            try:
+                approve_certificate_request(
+                    certificate_request.pk,
+                    request.user,
+                    lambda token: request.build_absolute_uri(
+                        reverse(
+                            "franchise:certificate_verify",
+                            kwargs={"token": token},
+                        )
+                    ),
+                )
+            except (PermissionError, ValueError) as error:
+                failed += 1
+                self.message_user(
+                    request,
+                    f"Request {certificate_request.pk} was not approved: {error}",
+                    level=messages.WARNING,
+                )
+            except Exception:
+                failed += 1
+                logger.exception(
+                    "Certificate approval failed for request ID %s.",
+                    certificate_request.pk,
+                )
+                self.message_user(
+                    request,
+                    f"Request {certificate_request.pk} could not be approved. Check the server log.",
+                    level=messages.ERROR,
+                )
+            else:
+                approved += 1
+        if approved:
+            self.message_user(request, f"{approved} certificate request(s) approved.")
+        if failed:
+            self.message_user(
+                request,
+                f"{failed} certificate request(s) were not approved.",
+                level=messages.WARNING,
+            )
+
+    @admin.action(description="Reject selected pending certificate requests")
+    def reject_requests(self, request, queryset):
+        if not self._require_superuser(request):
+            return
+
+        rejected = 0
+        for certificate_request in queryset:
+            try:
+                reject_certificate_request(certificate_request.pk, request.user)
+            except (PermissionError, ValueError) as error:
+                self.message_user(
+                    request,
+                    f"Request {certificate_request.pk} was not rejected: {error}",
+                    level=messages.WARNING,
+                )
+            else:
+                rejected += 1
+        if rejected:
+            self.message_user(request, f"{rejected} request(s) rejected.")
+
+    @admin.action(description="Revoke selected approved certificates")
+    def revoke_certificates(self, request, queryset):
+        if not self._require_superuser(request):
+            return
+        updated = queryset.filter(
+            status=CertificateRequest.STATUS_APPROVED,
+            is_revoked=False,
+        ).update(is_revoked=True)
+        self.message_user(
+            request,
+            f"{updated} certificate(s) revoked.",
+            level=messages.WARNING,
+        )

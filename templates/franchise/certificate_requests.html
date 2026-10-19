@@ -1,0 +1,135 @@
+{% extends 'franchise/portal_base.html' %}
+
+{% block title %}Course Certificates{% endblock %}
+{% block nav_certificates %}active{% endblock %}
+{% block nav_staff_certificates %}active{% endblock %}
+{% block breadcrumb %}<span class="separator">/</span> Course Certificates{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h4 class="mb-1 fw-700" style="color:#0b2450;">Course Certificates</h4>
+        <p class="text-muted mb-0 small">Find a student in your franchise and submit a request for superuser review.</p>
+    </div>
+</div>
+
+<div class="portal-card mb-4">
+    <div class="portal-card-header">
+        <h5><i class="bi bi-search me-2 text-primary"></i>Find a student</h5>
+    </div>
+    <div class="portal-card-body">
+        <form method="get" class="row g-2">
+            <div class="col-sm">
+                <label for="certificate-student-search" class="form-label">Student name or registration number</label>
+                <input id="certificate-student-search" class="form-control" type="search" name="q"
+                       value="{{ query }}" maxlength="180" placeholder="Search your franchise students">
+            </div>
+            <div class="col-sm-auto align-self-end">
+                <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>Search</button>
+            </div>
+        </form>
+
+        {% if query %}
+            <div class="table-responsive mt-4">
+                <table class="table portal-table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Registration No.</th>
+                            <th>Course</th>
+                            <th>Institution</th>
+                            <th>Study Mode</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in student_results %}
+                            <tr>
+                                <td>{{ student.full_name }}</td>
+                                <td><code>{{ student.registration_number }}</code></td>
+                                <td>{{ student.course.name }}</td>
+                                <td>{{ student.university.name|default:"—" }}</td>
+                                <td>{{ student.get_study_mode_display }}</td>
+                                <td>
+                                    <a class="btn btn-sm btn-outline-primary text-nowrap"
+                                       href="{% url 'franchise:certificate_request_create' student.pk %}">
+                                        <i class="bi bi-award me-1"></i>Request Certificate
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="6" class="text-center text-muted py-4">No eligible students matched. Students with an existing pending request or active certificate are not listed.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if student_results.has_other_pages %}
+                <nav class="mt-3" aria-label="Student search results pages">
+                    <ul class="pagination pagination-sm mb-0">
+                        {% if student_results.has_previous %}
+                            <li class="page-item"><a class="page-link" href="?q={{ query|urlencode }}&student_page={{ student_results.previous_page_number }}">Previous</a></li>
+                        {% endif %}
+                        <li class="page-item disabled"><span class="page-link">Page {{ student_results.number }} of {{ student_results.paginator.num_pages }}</span></li>
+                        {% if student_results.has_next %}
+                            <li class="page-item"><a class="page-link" href="?q={{ query|urlencode }}&student_page={{ student_results.next_page_number }}">Next</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+<div class="portal-card">
+    <div class="portal-card-header">
+        <h5><i class="bi bi-clock-history me-2 text-primary"></i>Certificate request history</h5>
+    </div>
+    <div class="portal-card-body p-0">
+        <div class="table-responsive">
+            <table class="table portal-table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Registration No.</th>
+                        <th>Course / Institution</th>
+                        <th>Study Mode</th>
+                        <th>Franchise</th>
+                        <th>Submitted</th>
+                        <th>Status</th>
+                        <th>Admin Remarks</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in history %}
+                        <tr>
+                            <td>{{ item.student.full_name }}</td>
+                            <td><code>{{ item.student.registration_number }}</code></td>
+                            <td>{{ item.student.course.name }}<br><small class="text-muted">{{ item.student.university.name|default:"—" }}</small></td>
+                            <td>{{ item.student.get_study_mode_display }}</td>
+                            <td>{{ item.franchise.business_name|default:item.franchise }}</td>
+                            <td>{{ item.requested_at|date:"d M Y" }}</td>
+                            <td>
+                                <span class="badge-status badge-{{ item.status }}">
+                                    {{ item.get_status_display }}{% if item.is_revoked %} · Revoked{% endif %}
+                                </span>
+                            </td>
+                            <td class="small">{{ item.admin_remarks|default:"—" }}</td>
+                            <td>
+                                {% if item.status == "approved" and not item.is_revoked %}
+                                    <a class="btn btn-sm btn-primary text-nowrap"
+                                       href="{% url 'franchise:certificate_download' item.pk %}">
+                                        <i class="bi bi-download me-1"></i>Download
+                                    </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="9" class="text-center text-muted py-4">No certificate requests have been submitted.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

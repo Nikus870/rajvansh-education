@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import certificate_views, views
 
 app_name = "franchise"
 
@@ -17,6 +17,24 @@ urlpatterns = [
     # Dashboards
     path("dashboard/", views.dashboard, name="dashboard"),
     path("dashboard/staff/", views.staff_dashboard, name="staff_dashboard"),
+
+    # Course certificate requests
+    path("certificates/", certificate_views.certificate_requests, name="certificate_requests"),
+    path(
+        "certificates/request/<int:student_id>/",
+        certificate_views.certificate_request_create,
+        name="certificate_request_create",
+    ),
+    path(
+        "certificates/<int:request_id>/download/",
+        certificate_views.certificate_download,
+        name="certificate_download",
+    ),
+    path(
+        "certificates/verify/<str:token>/",
+        certificate_views.certificate_verify,
+        name="certificate_verify",
+    ),
 
     # Staff management (franchise owner only)
     path("staff/", views.staff_list, name="staff_list"),

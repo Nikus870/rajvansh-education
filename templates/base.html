@@ -82,9 +82,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'franchise:landing' %}">Franchise</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'franchise:login' %}">Franchise Login</a>
-                    </li>
+                    {% if request.resolver_match.url_name != "home" %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'franchise:login' %}">Franchise Login</a>
+                        </li>
+                    {% endif %}
                 {% endif %}
 
                 <li class="nav-item">
@@ -138,7 +140,9 @@
                     <a href="{% url 'universities:list' %}">Universities</a>
                     <a href="{% url 'core:faq' %}">FAQ</a>
                     <a href="{% url 'franchise:landing' %}">Franchise</a>
-                    <a href="{% url 'franchise:login' %}">Franchise Login</a>
+                    {% if request.resolver_match.url_name != "home" %}
+                        <a href="{% url 'franchise:login' %}">Franchise Login</a>
+                    {% endif %}
                 </div>
             </div>
 

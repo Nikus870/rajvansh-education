@@ -167,6 +167,13 @@ class FranchiseLoginForm(forms.Form):
         return self.user_cache
 
 
+class CertificateRequestConfirmForm(forms.Form):
+    confirm = forms.BooleanField(
+        required=True,
+        label="I have reviewed the student and course details above.",
+    )
+
+
 class FranchiseSetPasswordForm(forms.Form):
     """Used for both franchise owner activation and staff invitation acceptance."""
 

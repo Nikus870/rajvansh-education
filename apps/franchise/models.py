@@ -2,9 +2,12 @@ import secrets
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
+from .certificate_storage import get_certificate_storage
 
 class FranchiseProfile(models.Model):
     user = models.OneToOneField(
@@ -174,3 +177,109 @@ class FranchiseStaffInvitation(models.Model):
 
     def __str__(self):
         return f"Invitation – {self.staff.email}"
+
+
+class CertificateRequest(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_APPROVED, "Approved"),
+        (STATUS_REJECTED, "Rejected"),
+    ]
+
+    student = models.ForeignKey(
+        "students.Student",
+        on_delete=models.PROTECT,
+        related_name="certificate_requests",
+    )
+    franchise = models.ForeignKey(
+        FranchiseProfile,
+        on_delete=models.PROTECT,
+        related_name="certificate_requests",
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="certificate_requests",
+    )
+    requested_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+    )
+    eligibility_verified = models.BooleanField(
+        default=False,
+        help_text="Confirm verified course completion before approval.",
+    )
+    eligibility_remarks = models.TextField(
+        blank=True,
+        help_text="Record the evidence source reviewed before approving eligibility.",
+    )
+    admin_remarks = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_certificate_requests",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    certificate_number = models.CharField(
+        max_length=40,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+    issued_at = models.DateField(null=True, blank=True)
+    verification_token = models.CharField(
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+        editable=False,
+    )
+    is_revoked = models.BooleanField(default=False)
+    certificate_file = models.FileField(
+        upload_to="",
+        storage=get_certificate_storage,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["-requested_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student"],
+                condition=Q(status="pending"),
+                name="unique_pending_certificate_per_student",
+            ),
+            models.UniqueConstraint(
+                fields=["student"],
+                condition=Q(status="approved", is_revoked=False),
+                name="unique_active_certificate_per_student",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status", "requested_at"]),
+            models.Index(fields=["franchise", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.student} certificate request ({self.get_status_display()})"
+
+    @property
+    def course(self):
+        return self.student.course
+
+    def clean(self):
+        super().clean()
+        if self.student_id and self.franchise_id:
+            if self.student.franchise_id != self.franchise_id:
+                raise ValidationError(
+                    {"franchise": "The requesting franchise must own this student."}
+                )

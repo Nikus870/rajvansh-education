@@ -302,6 +302,14 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # =========================================================
 
 MEDIA_URL = "/media/"
+CERTIFICATE_STORAGE_ROOT_ENV = os.getenv("CERTIFICATE_STORAGE_ROOT", "").strip()
+if not (DEBUG or TESTING) and not CERTIFICATE_STORAGE_ROOT_ENV:
+    raise ImproperlyConfigured(
+        "CERTIFICATE_STORAGE_ROOT must point to durable, private certificate storage."
+    )
+CERTIFICATE_STORAGE_ROOT = Path(
+    CERTIFICATE_STORAGE_ROOT_ENV or BASE_DIR / "private-certificates"
+).resolve()
 
 MEDIA_ROOT_ENV = os.getenv("MEDIA_ROOT", "").strip()
 
@@ -321,6 +329,16 @@ else:
     if not MEDIA_ROOT.is_absolute():
         raise ImproperlyConfigured(
             "MEDIA_ROOT must be an absolute directory path."
+        )
+
+if not (DEBUG or TESTING):
+    try:
+        CERTIFICATE_STORAGE_ROOT.relative_to(MEDIA_ROOT.resolve())
+    except ValueError:
+        pass
+    else:
+        raise ImproperlyConfigured(
+            "CERTIFICATE_STORAGE_ROOT must be outside MEDIA_ROOT."
         )
 
 

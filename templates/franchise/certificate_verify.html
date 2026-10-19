@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Certificate Verification{% endblock %}
+
+{% block content %}
+<section class="section section-light">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-7">
+                {% if valid %}
+                    <div class="alert alert-success" role="status">
+                        <h1 class="h3">Certificate verified</h1>
+                        <p class="mb-0">This certificate is valid and has not been revoked.</p>
+                    </div>
+                    <dl class="row bg-white border rounded p-4">
+                        <dt class="col-sm-4">Certificate number</dt><dd class="col-sm-8">{{ certificate.certificate_number }}</dd>
+                        <dt class="col-sm-4">Student name</dt><dd class="col-sm-8">{{ certificate.student.full_name }}</dd>
+                        <dt class="col-sm-4">Course</dt><dd class="col-sm-8">{{ certificate.student.course.name }}</dd>
+                        <dt class="col-sm-4">Issue date</dt><dd class="col-sm-8">{{ certificate.issued_at|date:"d M Y" }}</dd>
+                    </dl>
+                {% else %}
+                    <div class="alert alert-danger" role="status">
+                        <h1 class="h3">Certificate not valid</h1>
+                        <p class="mb-0">This certificate could not be verified or has been revoked.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

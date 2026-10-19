@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -120,11 +120,16 @@ class FranchiseUpgradeIntegrationTests(TestCase):
         )
         self.assertRedirects(response, reverse("franchise:dashboard"))
 
-    def test_public_franchise_login_link_and_anonymous_login_page(self):
+    def test_homepage_hides_franchise_login_but_other_pages_keep_link(self):
         self.client.force_login(self.admin_user)
         home_response = self.client.get(reverse("core:home"))
-        self.assertContains(
+        self.assertNotContains(
             home_response,
+            f'href="{reverse("franchise:login")}"',
+        )
+        about_response = self.client.get(reverse("core:about"))
+        self.assertContains(
+            about_response,
             f'href="{reverse("franchise:login")}"',
         )
         self.client.logout()
@@ -162,8 +167,12 @@ class FranchiseUpgradeIntegrationTests(TestCase):
         )
         self.assertRedirects(staff_response, reverse("franchise:staff_dashboard"))
 
-    @patch("apps.franchise.admin.send_mail", return_value=1)
-    def test_public_approval_activation_and_owner_login_workflow(self, _send_mail):
+    @override_settings(RESEND_API_KEY="test-resend-key")
+    @patch(
+        "apps.franchise.admin.resend.Emails.send",
+        return_value={"id": "test-email-id"},
+    )
+    def test_public_approval_activation_and_owner_login_workflow(self, _send_email):
         response = self.client.post(
             reverse("franchise:register"),
             {
@@ -424,8 +433,12 @@ class FranchiseUpgradeIntegrationTests(TestCase):
         response = self.client.get(reverse("franchise:activate", kwargs={"token": token.token}))
         self.assertRedirects(response, reverse("franchise:login"))
 
-    @patch("apps.franchise.admin.send_mail", return_value=1)
-    def test_admin_activation_resend_renews_expired_token(self, _send_mail):
+    @override_settings(RESEND_API_KEY="test-resend-key")
+    @patch(
+        "apps.franchise.admin.resend.Emails.send",
+        return_value={"id": "test-email-id"},
+    )
+    def test_admin_activation_resend_renews_expired_token(self, _send_email):
         app = FranchiseApplication.objects.create(
             name="Expired Applicant",
             email="expired@applicant.com",
