@@ -9,7 +9,7 @@ from django.db.models import Q
 
 from apps.students.models import Student
 
-from .models import FranchiseApplication, FranchiseStaff
+from .models import FranchiseApplication, FranchiseProfile, FranchiseStaff
 
 
 class CertificateStudentSelectionForm(forms.Form):
@@ -33,6 +33,28 @@ class CertificateStudentSelectionForm(forms.Form):
                 f"{student.course.name}"
             )
         )
+
+
+class FranchiseProfilePhotoForm(forms.ModelForm):
+    class Meta:
+        model = FranchiseProfile
+        fields = ["profile_image"]
+        widgets = {
+            "profile_image": forms.FileInput(
+                attrs={"accept": "image/jpeg,image/png,image/webp"}
+            )
+        }
+
+
+class FranchiseStaffPhotoForm(forms.ModelForm):
+    class Meta:
+        model = FranchiseStaff
+        fields = ["profile_image"]
+        widgets = {
+            "profile_image": forms.FileInput(
+                attrs={"accept": "image/jpeg,image/png,image/webp"}
+            )
+        }
 
 
 class FranchiseRegistrationForm(forms.ModelForm):

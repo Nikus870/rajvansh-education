@@ -1,5 +1,6 @@
 from unittest.mock import patch
 from datetime import date, datetime, time
+from io import BytesIO
 
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
@@ -8,11 +9,15 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 from pypdf import PdfReader
 
 from apps.courses.models import Course, CourseCategory
 from apps.franchise.analytics import get_student_growth_analytics
 from apps.franchise.certificate_service import (
+    CERTIFICATE_TEMPLATE_HEIGHT,
+    CERTIFICATE_TEMPLATE_WIDTH,
+    CERTIFICATE_TEMPLATE_PATH,
     approve_certificate_request,
     reject_certificate_request,
     revoke_certificate_request,
@@ -301,6 +306,10 @@ class CertificateRequestTests(TestCase):
         for name in self.created_certificate_names:
             if storage.exists(name):
                 storage.delete(name)
+        if self.student.profile_image:
+            image_storage = self.student.profile_image.storage
+            if image_storage.exists(self.student.profile_image.name):
+                image_storage.delete(self.student.profile_image.name)
 
     def create_student(self, franchise, creator, name, registration_number):
         student = Student.objects.create(
@@ -605,6 +614,18 @@ class CertificateRequestTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_superuser_approval_generates_unique_certificate_and_valid_pdf(self):
+        self.student.guardian_name = "Test Guardian"
+        self.student.save(update_fields=("guardian_name",))
+        self.course.duration = "12 months"
+        self.course.save(update_fields=("duration",))
+        photo = BytesIO()
+        Image.new("RGB", (240, 360), (55, 150, 110)).save(photo, format="PNG")
+        self.student.profile_image.save(
+            "certificate-student.png",
+            ContentFile(photo.getvalue()),
+            save=True,
+        )
+
         approved = self.approve(self.request)
         self.assertEqual(approved.status, CertificateRequest.STATUS_APPROVED)
         self.assertTrue(approved.certificate_number)
@@ -622,7 +643,48 @@ class CertificateRequestTests(TestCase):
         self.assertTrue(pdf_bytes.rstrip().endswith(b"%%EOF"))
         reader = PdfReader(approved.certificate_file.path)
         self.assertEqual(len(reader.pages), 1)
-        self.assertIn(self.student.full_name, reader.pages[0].extract_text())
+        page = reader.pages[0]
+        self.assertAlmostEqual(
+            float(page.mediabox.width) / float(page.mediabox.height),
+            CERTIFICATE_TEMPLATE_WIDTH / CERTIFICATE_TEMPLATE_HEIGHT,
+            places=5,
+        )
+        self.assertTrue(CERTIFICATE_TEMPLATE_PATH.is_file())
+        self.assertEqual(len(page.images), 2)
+        self.assertIn(
+            (CERTIFICATE_TEMPLATE_WIDTH, CERTIFICATE_TEMPLATE_HEIGHT),
+            {image.image.size for image in page.images},
+        )
+        page_text = page.extract_text()
+        for certificate_value in (
+            self.student.full_name,
+            self.student.guardian_name,
+            self.student.registration_number,
+            self.course.name,
+            self.university.name,
+            self.course.duration,
+            approved.certificate_number,
+            approved.issued_at.strftime("%d %B %Y"),
+            "/franchise/certificates/verify/",
+        ):
+            self.assertIn(certificate_value, page_text)
+        text_positions = {}
+
+        def record_text_position(text, matrix, text_matrix, font_dict, font_size):
+            if self.student.full_name in text:
+                text_positions["student_name"] = (text_matrix[4], text_matrix[5])
+
+        page.extract_text(visitor_text=record_text_position)
+        self.assertIn("student_name", text_positions)
+        name_x, name_y = text_positions["student_name"]
+        expected_scale = float(page.mediabox.height) / CERTIFICATE_TEMPLATE_HEIGHT
+        self.assertGreaterEqual(name_x, 205 * expected_scale)
+        self.assertLess(name_x, (205 + 1585) * expected_scale / 2)
+        self.assertAlmostEqual(
+            name_y,
+            (CERTIFICATE_TEMPLATE_HEIGHT - 1139) * expected_scale,
+            delta=2,
+        )
         with self.assertRaisesMessage(ValueError, "Only pending"):
             approve_certificate_request(
                 approved.pk,
@@ -631,6 +693,18 @@ class CertificateRequestTests(TestCase):
             )
         approved.refresh_from_db()
         self.assertEqual(approved.certificate_number, certificate_number)
+
+    def test_certificate_name_supports_devanagari_text(self):
+        self.student.full_name = "राजवंश विद्यार्थी"
+        self.student.save(update_fields=("full_name",))
+        approved = self.approve(self.request)
+
+        with approved.certificate_file.open("rb") as certificate_file:
+            reader = PdfReader(certificate_file)
+            self.assertIn(
+                self.student.full_name,
+                reader.pages[0].extract_text(),
+            )
 
     def test_approved_certificate_download_and_verification(self):
         approved = self.approve(self.request)
@@ -792,8 +866,11 @@ class CertificateRequestTests(TestCase):
 
     def test_franchise_login_dashboard_and_homepage_navigation(self):
         home = self.client.get(reverse("core:home"))
-        self.assertContains(home, "Franchise Login")
-        self.assertContains(home, f'href="{reverse("franchise:login")}"')
+        self.assertNotContains(home, "Franchise Login")
+        self.assertNotContains(home, f'href="{reverse("franchise:login")}"')
+        about = self.client.get(reverse("core:about"))
+        self.assertContains(about, "Franchise Login")
+        self.assertContains(about, f'href="{reverse("franchise:login")}"')
         self.assertEqual(self.client.get(reverse("franchise:login")).status_code, 200)
 
         self.client.force_login(self.owner_user)

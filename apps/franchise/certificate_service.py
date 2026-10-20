@@ -1,121 +1,358 @@
 import logging
 import secrets
 import uuid
-from datetime import date
 from io import BytesIO
 from pathlib import Path
 
-from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
-from reportlab import __file__ as reportlab_package
-from reportlab.lib.pagesizes import A4, landscape
+from PIL import Image, ImageOps, UnidentifiedImageError
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
 from .models import CertificateRequest
+from .profile_images import MAX_PROFILE_IMAGE_PIXELS
 
 logger = logging.getLogger(__name__)
 
+CERTIFICATE_TEMPLATE_PATH = (
+    Path(__file__).resolve().parent
+    / "static"
+    / "franchise"
+    / "images"
+    / "certificate_template.png"
+)
+CERTIFICATE_TEMPLATE_WIDTH = 1792
+CERTIFICATE_TEMPLATE_HEIGHT = 2400
+CERTIFICATE_PAGE_HEIGHT = 842
+
 
 def _register_unicode_fonts():
-    bundled_font_dir = Path(reportlab_package).parent / "fonts"
+    project_font_dir = (
+        Path(__file__).resolve().parent
+        / "static"
+        / "franchise"
+        / "fonts"
+    )
     font_paths = (
         Path("C:/Windows/Fonts/Nirmala.ttf"),
-        Path("C:/Windows/Fonts/arial.ttf"),
+        project_font_dir / "NotoSansDevanagari.ttf",
         Path("/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"),
         Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-        bundled_font_dir / "Vera.ttf",
     )
     bold_font_paths = (
         Path("C:/Windows/Fonts/NirmalaB.ttf"),
-        Path("C:/Windows/Fonts/arialbd.ttf"),
         Path("/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"),
+        project_font_dir / "NotoSansDevanagari.ttf",
         Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
-        bundled_font_dir / "VeraBd.ttf",
     )
     regular = next((path for path in font_paths if path.is_file()), None)
     bold = next((path for path in bold_font_paths if path.is_file()), None)
-    if regular:
-        if "CertificateUnicode" not in pdfmetrics.getRegisteredFontNames():
-            pdfmetrics.registerFont(TTFont("CertificateUnicode", str(regular)))
-            pdfmetrics.registerFont(
-                TTFont("CertificateUnicode-Bold", str(bold or regular))
+    if regular is None:
+        raise FileNotFoundError("A Unicode font is required to generate certificates.")
+    if "CertificateUnicode" not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(TTFont("CertificateUnicode", str(regular)))
+        pdfmetrics.registerFont(
+            TTFont("CertificateUnicode-Bold", str(bold or regular))
+        )
+    return "CertificateUnicode", "CertificateUnicode-Bold"
+
+
+def _wrap_text(text, font_name, font_size, max_width):
+    lines = []
+    line = ""
+
+    for word in text.split():
+        if pdfmetrics.stringWidth(word, font_name, font_size) > max_width:
+            if line:
+                lines.append(line)
+                line = ""
+            chunk = ""
+            for character in word:
+                candidate = chunk + character
+                if chunk and pdfmetrics.stringWidth(
+                    candidate,
+                    font_name,
+                    font_size,
+                ) > max_width:
+                    lines.append(chunk)
+                    chunk = character
+                else:
+                    chunk = candidate
+            line = chunk
+            continue
+
+        candidate = f"{line} {word}".strip()
+        if line and pdfmetrics.stringWidth(
+            candidate,
+            font_name,
+            font_size,
+        ) > max_width:
+            lines.append(line)
+            line = word
+        else:
+            line = candidate
+
+    if line:
+        lines.append(line)
+    return lines
+
+
+def _draw_fitted_field(
+    document,
+    text,
+    font_name,
+    *,
+    scale,
+    left_px,
+    right_px,
+    baseline_px,
+    max_size,
+    min_size=6.5,
+    max_lines=6,
+    leading=8,
+    alignment="center",
+):
+    text = (text or "").strip()
+    if not text:
+        return
+
+    max_width = (right_px - left_px) * scale
+    font_size = max_size
+    lines = _wrap_text(text, font_name, font_size, max_width)
+    while len(lines) > max_lines and font_size > min_size:
+        font_size = max(min_size, font_size - 0.5)
+        lines = _wrap_text(text, font_name, font_size, max_width)
+    if len(lines) > max_lines:
+        raise ValueError("Certificate text does not fit its printed field.")
+
+    x = left_px * scale
+    if alignment == "center":
+        x = (left_px + right_px) * scale / 2
+    center_y = (
+        CERTIFICATE_TEMPLATE_HEIGHT - baseline_px
+    ) * scale
+    document.setFont(font_name, font_size)
+    first_baseline = center_y + (len(lines) - 1) * leading / 2
+    for index, line in enumerate(lines):
+        if alignment == "center":
+            document.drawCentredString(
+                x,
+                first_baseline - index * leading,
+                line,
+                shaping=True,
             )
-        return "CertificateUnicode", "CertificateUnicode-Bold"
-    return "Helvetica", "Helvetica-Bold"
+        else:
+            document.drawString(
+                x,
+                first_baseline - index * leading,
+                line,
+                shaping=True,
+            )
+
+
+def _student_photo(student, certificate_request_id):
+    if not student.profile_image:
+        return None
+
+    try:
+        with student.profile_image.open("rb") as photo_file:
+            with Image.open(photo_file) as photo:
+                if photo.width * photo.height > MAX_PROFILE_IMAGE_PIXELS:
+                    logger.warning(
+                        "Student photo exceeds the image size limit for certificate request %s.",
+                        certificate_request_id,
+                    )
+                    return None
+                return ImageOps.fit(
+                    photo.convert("RGB"),
+                    (340, 500),
+                    method=Image.Resampling.LANCZOS,
+                    centering=(0.5, 0.38),
+                )
+    except FileNotFoundError:
+        logger.warning(
+            "Student photo is missing for certificate request %s.",
+            certificate_request_id,
+        )
+    except (
+        Image.DecompressionBombError,
+        UnidentifiedImageError,
+        OSError,
+        ValueError,
+    ):
+        logger.warning(
+            "Student photo could not be read for certificate request %s.",
+            certificate_request_id,
+            exc_info=True,
+        )
+    return None
 
 
 def generate_certificate_pdf(certificate_request, verification_url):
+    if not CERTIFICATE_TEMPLATE_PATH.is_file():
+        raise FileNotFoundError(
+            f"Certificate template is missing: {CERTIFICATE_TEMPLATE_PATH}"
+        )
+
+    with Image.open(CERTIFICATE_TEMPLATE_PATH) as template:
+        if template.size != (
+            CERTIFICATE_TEMPLATE_WIDTH,
+            CERTIFICATE_TEMPLATE_HEIGHT,
+        ):
+            raise ValueError("Certificate template dimensions do not match the layout.")
+        template_reader = ImageReader(template.copy())
+
     regular_font, bold_font = _register_unicode_fonts()
-    width, height = landscape(A4)
+    scale = CERTIFICATE_PAGE_HEIGHT / CERTIFICATE_TEMPLATE_HEIGHT
+    page_width = CERTIFICATE_TEMPLATE_WIDTH * scale
     output = BytesIO()
-    document = canvas.Canvas(output, pagesize=(width, height))
+    document = canvas.Canvas(
+        output,
+        pagesize=(page_width, CERTIFICATE_PAGE_HEIGHT),
+        pageCompression=1,
+    )
+    document.drawImage(
+        template_reader,
+        0,
+        0,
+        width=page_width,
+        height=CERTIFICATE_PAGE_HEIGHT,
+        mask="auto",
+    )
+    document.setFillColorRGB(0.09, 0.08, 0.08)
 
-    document.setFillColorRGB(0.98, 0.985, 0.995)
-    document.rect(0, 0, width, height, fill=1, stroke=0)
-    document.setStrokeColorRGB(0.05, 0.14, 0.31)
-    document.setLineWidth(3)
-    document.rect(24, 24, width - 48, height - 48, fill=0, stroke=1)
-    document.setStrokeColorRGB(0.76, 0.62, 0.31)
-    document.setLineWidth(1)
-    document.rect(32, 32, width - 64, height - 64, fill=0, stroke=1)
+    student = certificate_request.student
+    _draw_fitted_field(
+        document,
+        student.registration_number,
+        regular_font,
+        scale=scale,
+        left_px=1300,
+        right_px=1600,
+        baseline_px=210,
+        max_size=10,
+        max_lines=2,
+        alignment="left",
+    )
+    _draw_fitted_field(
+        document,
+        student.full_name,
+        bold_font,
+        scale=scale,
+        left_px=205,
+        right_px=1585,
+        baseline_px=1139,
+        max_size=19,
+        min_size=8,
+        leading=10,
+    )
+    _draw_fitted_field(
+        document,
+        student.guardian_name,
+        regular_font,
+        scale=scale,
+        left_px=465,
+        right_px=1585,
+        baseline_px=1270,
+        max_size=13,
+        alignment="left",
+    )
+    _draw_fitted_field(
+        document,
+        student.course.name,
+        regular_font,
+        scale=scale,
+        left_px=1095,
+        right_px=1585,
+        baseline_px=1398,
+        max_size=12,
+        alignment="left",
+    )
+    _draw_fitted_field(
+        document,
+        student.university.name if student.university_id else "",
+        regular_font,
+        scale=scale,
+        left_px=465,
+        right_px=1585,
+        baseline_px=1525,
+        max_size=12,
+        alignment="left",
+    )
+    _draw_fitted_field(
+        document,
+        student.course.duration,
+        regular_font,
+        scale=scale,
+        left_px=610,
+        right_px=1585,
+        baseline_px=1655,
+        max_size=12,
+        alignment="left",
+    )
+    _draw_fitted_field(
+        document,
+        certificate_request.issued_at.strftime("%d %B %Y")
+        if certificate_request.issued_at
+        else "",
+        regular_font,
+        scale=scale,
+        left_px=490,
+        right_px=790,
+        baseline_px=2105,
+        max_size=9,
+        min_size=6,
+        max_lines=1,
+        alignment="left",
+    )
+    _draw_fitted_field(
+        document,
+        certificate_request.certificate_number,
+        regular_font,
+        scale=scale,
+        left_px=375,
+        right_px=790,
+        baseline_px=2160,
+        max_size=9,
+        min_size=6,
+        max_lines=1,
+        alignment="left",
+    )
+    _draw_fitted_field(
+        document,
+        f"Verify this certificate: {verification_url}",
+        regular_font,
+        scale=scale,
+        left_px=100,
+        right_px=1692,
+        baseline_px=2285,
+        max_size=7,
+        min_size=5,
+        max_lines=1,
+    )
 
-    logo_path = settings.MEDIA_ROOT / "site" / "Rajvans_Education_Emblem_Logo.png"
-    if logo_path.is_file():
+    photo = _student_photo(student, certificate_request.pk)
+    if photo is not None:
+        photo_scale = page_width / CERTIFICATE_TEMPLATE_WIDTH
+        photo_left = 1387 * photo_scale
+        photo_bottom = (
+            CERTIFICATE_TEMPLATE_HEIGHT - 653
+        ) * photo_scale
+        photo_width = 170 * photo_scale
+        photo_height = 248 * photo_scale
         document.drawImage(
-            ImageReader(str(logo_path)),
-            width / 2 - 25,
-            height - 96,
-            width=50,
-            height=50,
-            preserveAspectRatio=True,
+            ImageReader(photo),
+            photo_left,
+            photo_bottom,
+            width=photo_width,
+            height=photo_height,
             mask="auto",
         )
 
-    document.setFillColorRGB(0.05, 0.14, 0.31)
-    document.setFont(bold_font, 15)
-    document.drawCentredString(width / 2, height - 116, "RAJVANS GROUP OF EDUCATIONS")
-    document.setFont(bold_font, 27)
-    document.drawCentredString(width / 2, height - 160, "COURSE COMPLETION CERTIFICATE")
-    document.setFillColorRGB(0.32, 0.36, 0.43)
-    document.setFont(regular_font, 13)
-    document.drawCentredString(width / 2, height - 195, "This certificate is issued to")
-
-    student = certificate_request.student
-    document.setFillColorRGB(0.05, 0.14, 0.31)
-    document.setFont(bold_font, 25)
-    document.drawCentredString(width / 2, height - 237, student.full_name)
-    document.setStrokeColorRGB(0.76, 0.62, 0.31)
-    document.setLineWidth(1)
-    document.line(width * 0.25, height - 249, width * 0.75, height - 249)
-
-    document.setFillColorRGB(0.22, 0.25, 0.31)
-    document.setFont(regular_font, 14)
-    document.drawCentredString(width / 2, height - 278, "for completion of the course")
-    document.setFont(bold_font, 19)
-    document.drawCentredString(width / 2, height - 309, student.course.name)
-
-    institution = student.university.name if student.university_id else ""
-    if institution:
-        document.setFont(regular_font, 11)
-        document.drawCentredString(width / 2, height - 333, f"Institution: {institution}")
-
-    issued_date = certificate_request.issued_at or date.today()
-    document.setFont(regular_font, 10)
-    document.drawString(58, 91, f"Registration No.: {student.registration_number}")
-    document.drawString(58, 73, f"Certificate No.: {certificate_request.certificate_number}")
-    document.drawRightString(width - 58, 91, f"Issue Date: {issued_date:%d %B %Y}")
-    document.setStrokeColorRGB(0.05, 0.14, 0.31)
-    document.line(width - 220, 93, width - 58, 93)
-    document.setFont(regular_font, 9)
-    document.drawRightString(width - 58, 78, "Authorized Signatory")
-    document.setFillColorRGB(0.32, 0.36, 0.43)
-    document.setFont(regular_font, 8)
-    document.drawCentredString(width / 2, 51, f"Verify this certificate: {verification_url}")
     document.showPage()
     document.save()
     return output.getvalue()

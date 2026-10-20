@@ -51,7 +51,7 @@
                     <div class="hero-image-frame">
                         <img
                             src="{% static 'images/student-study-hero.webp' %}"
-                            alt="College-age students studying together at laptops in a modern workspace"
+                            alt="Student studying online in a modern learning environment"
                             loading="eager"
                             decoding="async"
                         >
@@ -70,31 +70,24 @@
                 <span class="eyebrow">A clear next step</span>
                 <h2>How can we help you today?</h2>
             </div>
-            <p>Explore learning options, speak with our team, or manage your franchise.</p>
+            <p>Explore learning options or speak with our team.</p>
         </div>
         <div class="row g-3">
-            <div class="col-sm-6 col-xl-3">
+            <div class="col-sm-6 col-xl-4">
                 <a class="quick-access-card" href="{% url 'courses:list' %}">
                     <span class="quick-access-icon"><i class="bi bi-journal-bookmark" aria-hidden="true"></i></span>
                     <span class="quick-access-copy"><strong>Explore Courses</strong><small>Browse available study pathways</small></span>
                     <i class="bi bi-arrow-up-right quick-access-arrow" aria-hidden="true"></i>
                 </a>
             </div>
-            <div class="col-sm-6 col-xl-3">
+            <div class="col-sm-6 col-xl-4">
                 <a class="quick-access-card" href="{% url 'inquiries:consultation' %}">
                     <span class="quick-access-icon"><i class="bi bi-chat-square-text" aria-hidden="true"></i></span>
                     <span class="quick-access-copy"><strong>Get Guidance</strong><small>Talk through your education goals</small></span>
                     <i class="bi bi-arrow-up-right quick-access-arrow" aria-hidden="true"></i>
                 </a>
             </div>
-            <div class="col-sm-6 col-xl-3">
-                <a class="quick-access-card" href="{% url 'franchise:login' %}">
-                    <span class="quick-access-icon"><i class="bi bi-building-lock" aria-hidden="true"></i></span>
-                    <span class="quick-access-copy"><strong>Franchise Login</strong><small>Access your franchise workspace</small></span>
-                    <i class="bi bi-arrow-up-right quick-access-arrow" aria-hidden="true"></i>
-                </a>
-            </div>
-            <div class="col-sm-6 col-xl-3">
+            <div class="col-sm-6 col-xl-4">
                 <a class="quick-access-card" href="{% url 'franchise:register' %}">
                     <span class="quick-access-icon"><i class="bi bi-person-vcard" aria-hidden="true"></i></span>
                     <span class="quick-access-copy"><strong>Apply for a Franchise</strong><small>Share your interest with our team</small></span>

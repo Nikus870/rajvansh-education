@@ -104,7 +104,14 @@
                                 </a>
                             </td>
                             <td>
-                                <strong>{{ student.full_name }}</strong>
+                                <div class="d-flex align-items-center gap-2">
+                                    {% if student.has_profile_image %}
+                                        <img class="profile-photo profile-photo--thumbnail" src="{% url 'students:profile_image' student.pk %}" alt="" loading="lazy">
+                                    {% else %}
+                                        <span class="profile-photo profile-photo--thumbnail profile-photo--default" aria-hidden="true"><i class="bi bi-person"></i></span>
+                                    {% endif %}
+                                    <strong>{{ student.full_name }}</strong>
+                                </div>
                                 {% if student.guardian_name %}
                                     <div class="text-muted" style="font-size: 0.75rem;">S/D/W of {{ student.guardian_name }}</div>
                                 {% endif %}

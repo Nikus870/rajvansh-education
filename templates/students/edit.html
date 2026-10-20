@@ -25,7 +25,7 @@
         </div>
 
         <div class="portal-form-card">
-            <form method="post" novalidate>
+            <form method="post" enctype="multipart/form-data" novalidate>
                 {% csrf_token %}
 
                 {% if form.non_field_errors %}
@@ -41,6 +41,17 @@
                     <i class="bi bi-person me-2 text-primary"></i>Personal Information
                 </h6>
                 <div class="row g-3 mb-4">
+                    <div class="col-12">
+                        <label for="{{ form.profile_image.id_for_label }}" class="form-label fw-600">Student Profile Photo</label>
+                        {% if student.has_profile_image %}
+                            <img class="profile-photo profile-photo--large mb-2" src="{% url 'students:profile_image' student.pk %}" alt="Current photo of {{ student.full_name }}">
+                        {% endif %}
+                        {{ form.profile_image }}
+                        <div class="form-text">JPEG, PNG, or WEBP; maximum 5 MB.</div>
+                        {% if form.profile_image.errors %}
+                            <div class="text-danger small mt-1">{{ form.profile_image.errors.0 }}</div>
+                        {% endif %}
+                    </div>
                     <div class="col-md-6">
                         <label class="form-label fw-600">Full Name <span class="text-danger">*</span></label>
                         {{ form.full_name }}

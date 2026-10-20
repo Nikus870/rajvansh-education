@@ -25,6 +25,7 @@ class StudentRegistrationForm(forms.ModelForm):
             "mobile",
             "email",
             "address",
+            "profile_image",
             "course",
             "university",
             "study_mode",
@@ -36,6 +37,9 @@ class StudentRegistrationForm(forms.ModelForm):
         ]
 
         widgets = {
+            "profile_image": forms.FileInput(
+                attrs={"accept": "image/jpeg,image/png,image/webp"}
+            ),
             "date_of_birth": forms.DateInput(
                 attrs={"type": "date"},
                 format="%Y-%m-%d",
@@ -90,6 +94,7 @@ class StudentEditForm(forms.ModelForm):
             "mobile",
             "email",
             "address",
+            "profile_image",
             "course",
             "university",
             "study_mode",
@@ -101,6 +106,9 @@ class StudentEditForm(forms.ModelForm):
         ]
 
         widgets = {
+            "profile_image": forms.FileInput(
+                attrs={"accept": "image/jpeg,image/png,image/webp"}
+            ),
             "date_of_birth": forms.DateInput(
                 attrs={"type": "date"},
                 format="%Y-%m-%d",

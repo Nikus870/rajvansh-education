@@ -17,6 +17,7 @@ Set these values through the hosting provider's secret/environment manager; do n
 - `MEDIA_STORAGE_BACKEND`: a dotted Python path to an installed Django storage backend
 - `MEDIA_STORAGE_OPTIONS`: a JSON object of options accepted by that backend
 - `MEDIA_ROOT`: for Django's `django.core.files.storage.FileSystemStorage`, an explicit absolute directory
+- `PROFILE_IMAGE_STORAGE_ROOT`: an absolute private directory for student, franchise owner, and staff profile photos; keep it outside `MEDIA_ROOT` and on durable storage
 - `CERTIFICATE_STORAGE_BACKEND`: optional dotted path to private certificate storage; defaults to the project's private filesystem storage
 - `CERTIFICATE_STORAGE_OPTIONS`: JSON object passed to the configured certificate storage backend
 - `CERTIFICATE_STORAGE_ROOT`: required for the default filesystem backend; an absolute private directory outside `MEDIA_ROOT`
@@ -41,7 +42,9 @@ Render Free deployments that need certificate issuance must configure a private 
 
 The media URL route is enabled only with `DEBUG=True`. Therefore, on production Render, testimonial photos stored in the ephemeral directory are not served by the app's current URL configuration. Do not rely on testimonial photo uploads/display on the Free setup; omit photos until durable object storage or a separately configured media-serving solution is adopted. This does not affect site pages, enquiries, franchise operations, student records, authentication, or Django Admin.
 
-For deployments with durable filesystem storage, attach a Render Persistent Disk (paid plan), use sibling paths such as `MEDIA_ROOT=/var/data/public-media` and `CERTIFICATE_STORAGE_ROOT=/var/data/private-certificates`, and keep the private directory unserved. Set the same `MEDIA_STORAGE_BACKEND` and `MEDIA_STORAGE_OPTIONS` values above. If backend options include `location`, it must match `MEDIA_ROOT`. Production settings reject FileSystemStorage when `MEDIA_ROOT` is absent or not absolute; they do not silently fall back to a project-directory media folder.
+Student, franchise owner, and staff profile photos use a separate private filesystem directory and are streamed only by authenticated, franchise-scoped views; direct storage URLs are disabled. The default `PROFILE_IMAGE_STORAGE_ROOT=/tmp/rajvans-profile-images` is private but ephemeral on Render Free, so uploaded photos can disappear on restart or redeploy. For durable photo storage, attach a Render Persistent Disk and set `PROFILE_IMAGE_STORAGE_ROOT=/var/data/private-profile-images`; this directory must remain outside `MEDIA_ROOT`. Back up the disk along with the database. The current implementation uses local filesystem storage for profile photos and does not configure a remote object-storage provider.
+
+For deployments with durable filesystem storage, attach a Render Persistent Disk (paid plan), use paths such as `MEDIA_ROOT=/var/data/public-media`, `PROFILE_IMAGE_STORAGE_ROOT=/var/data/private-profile-images`, and `CERTIFICATE_STORAGE_ROOT=/var/data/private-certificates`, and keep private directories unserved. Set the same `MEDIA_STORAGE_BACKEND` and `MEDIA_STORAGE_OPTIONS` values above. If backend options include `location`, it must match `MEDIA_ROOT`. Production settings reject FileSystemStorage when `MEDIA_ROOT` is absent or not absolute; they do not silently fall back to a project-directory media folder.
 
 Access to Django Admin is restricted to active superusers; `is_staff=True` by itself does not grant access. Existing franchise-account flags are not changed automatically. Before deployment, review franchise-linked accounts in the target database and correct only confirmed misconfigured accounts, preserving legitimate superuser accounts.
 

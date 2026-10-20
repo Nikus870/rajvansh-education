@@ -50,6 +50,7 @@ urlpatterns = [
 
     # Profile
     path("profile/", views.franchise_profile, name="profile"),
+    path("profile/photo/", views.profile_photo, name="profile_photo"),
 
     # Password management
     path("change-password/", views.change_password, name="change_password"),

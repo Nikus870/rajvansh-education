@@ -12,7 +12,7 @@ pillow==11.3.0
 psycopg==3.3.6
 psycopg-binary==3.3.6
 pypdf==6.19.0
-reportlab==4.4.9
+reportlab[shaping]==4.4.9
 requests==2.34.2
 resend==2.50.0
 sqlparse==0.6.0

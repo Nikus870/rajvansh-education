@@ -21,6 +21,7 @@ from django.urls import reverse
 
 from .forms import StudentEditForm, StudentRegistrationForm, StudentSearchForm
 from .models import Student
+from apps.franchise.profile_images import serve_profile_image
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -130,7 +131,10 @@ def register_student(request):
         )
         return redirect("franchise:dashboard")
 
-    form = StudentRegistrationForm(request.POST or None)
+    form = StudentRegistrationForm(
+        request.POST or None,
+        request.FILES or None,
+    )
 
     if request.method == "POST" and form.is_valid():
         student = form.save(commit=False)
@@ -235,7 +239,11 @@ def student_edit(request, pk):
     qs = get_student_queryset(request.user)
     student = get_object_or_404(qs, pk=pk)
 
-    form = StudentEditForm(request.POST or None, instance=student)
+    form = StudentEditForm(
+        request.POST or None,
+        request.FILES or None,
+        instance=student,
+    )
 
     if request.method == "POST" and form.is_valid():
         form.save()
@@ -251,6 +259,12 @@ def student_edit(request, pk):
             "page_title": f"Edit – {student.full_name}",
         },
     )
+
+
+@franchise_required
+def student_profile_image(request, pk):
+    student = get_object_or_404(get_student_queryset(request.user), pk=pk)
+    return serve_profile_image(student.profile_image)
 
 
 @franchise_required

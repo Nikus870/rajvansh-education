@@ -2,9 +2,11 @@ import logging
 from secrets import token_urlsafe
 
 import resend
+from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.auth.models import User
+from django.db import models
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
@@ -114,6 +116,14 @@ Rajvansh Group of Educations
 
 @admin.register(FranchiseProfile)
 class FranchiseProfileAdmin(admin.ModelAdmin):
+    formfield_overrides = {
+        models.ImageField: {
+            "widget": forms.FileInput(
+                attrs={"accept": "image/jpeg,image/png,image/webp"}
+            )
+        }
+    }
+
     list_display = (
         "user",
         "mobile",
@@ -350,6 +360,14 @@ class FranchiseApplicationAdmin(admin.ModelAdmin):
 
 @admin.register(FranchiseStaff)
 class FranchiseStaffAdmin(admin.ModelAdmin):
+    formfield_overrides = {
+        models.ImageField: {
+            "widget": forms.FileInput(
+                attrs={"accept": "image/jpeg,image/png,image/webp"}
+            )
+        }
+    }
+
     list_display = (
         "name",
         "email",

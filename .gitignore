@@ -6,6 +6,7 @@ __pycache__/
 venv/
 media/*
 !media/.gitkeep
+private-profile-images/
 staticfiles/
 .vscode/
 *.log

@@ -333,6 +333,10 @@ if not isinstance(CERTIFICATE_STORAGE_OPTIONS, dict):
     )
 
 MEDIA_ROOT_ENV = os.getenv("MEDIA_ROOT", "").strip()
+PROFILE_IMAGE_STORAGE_ROOT_ENV = os.getenv(
+    "PROFILE_IMAGE_STORAGE_ROOT",
+    "",
+).strip()
 
 if DEBUG or TESTING:
     MEDIA_ROOT = (
@@ -351,6 +355,32 @@ else:
         raise ImproperlyConfigured(
             "MEDIA_ROOT must be an absolute directory path."
         )
+
+if (
+    not (DEBUG or TESTING)
+    and PROFILE_IMAGE_STORAGE_ROOT_ENV
+    and not Path(PROFILE_IMAGE_STORAGE_ROOT_ENV).is_absolute()
+):
+    raise ImproperlyConfigured(
+        "PROFILE_IMAGE_STORAGE_ROOT must be an absolute directory path."
+    )
+
+profile_image_root_default = (
+    BASE_DIR / "private-profile-images"
+    if DEBUG or TESTING
+    else Path("/tmp/rajvans-profile-images")
+)
+PROFILE_IMAGE_STORAGE_ROOT = Path(
+    PROFILE_IMAGE_STORAGE_ROOT_ENV or profile_image_root_default
+).resolve()
+try:
+    PROFILE_IMAGE_STORAGE_ROOT.relative_to(MEDIA_ROOT.resolve())
+except ValueError:
+    pass
+else:
+    raise ImproperlyConfigured(
+        "PROFILE_IMAGE_STORAGE_ROOT must be outside MEDIA_ROOT."
+    )
 
 if (
     not (DEBUG or TESTING)

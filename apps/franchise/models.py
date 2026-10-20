@@ -9,6 +9,11 @@ from django.db.models import Q
 from django.utils import timezone
 
 from .certificate_storage import get_certificate_storage
+from .profile_images import (
+    get_private_profile_image_storage,
+    profile_image_upload_to,
+    validate_profile_image,
+)
 
 class FranchiseProfile(models.Model):
     user = models.OneToOneField(
@@ -21,6 +26,12 @@ class FranchiseProfile(models.Model):
     state = models.CharField(max_length=100)
     business_name = models.CharField(max_length=180, blank=True)
     address = models.TextField(blank=True)
+    profile_image = models.ImageField(
+        upload_to=profile_image_upload_to,
+        storage=get_private_profile_image_storage,
+        validators=[validate_profile_image],
+        blank=True,
+    )
     monthly_student_target = models.PositiveIntegerField(
         default=20,
         validators=[MinValueValidator(1)],
@@ -30,6 +41,13 @@ class FranchiseProfile(models.Model):
 
     def __str__(self):
         return self.user.get_full_name() or self.user.username
+
+    @property
+    def has_profile_image(self):
+        return bool(
+            self.profile_image
+            and self.profile_image.storage.exists(self.profile_image.name)
+        )
 
 
 class FranchiseApplication(models.Model):
@@ -134,6 +152,12 @@ class FranchiseStaff(models.Model):
     )
 
     name = models.CharField(max_length=180)
+    profile_image = models.ImageField(
+        upload_to=profile_image_upload_to,
+        storage=get_private_profile_image_storage,
+        validators=[validate_profile_image],
+        blank=True,
+    )
     email = models.EmailField()
     role = models.CharField(
         max_length=20,
@@ -154,6 +178,13 @@ class FranchiseStaff(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.get_role_display()}) – {self.franchise}"
+
+    @property
+    def has_profile_image(self):
+        return bool(
+            self.profile_image
+            and self.profile_image.storage.exists(self.profile_image.name)
+        )
 
 
 class FranchiseStaffInvitation(models.Model):

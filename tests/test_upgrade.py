@@ -1,12 +1,17 @@
 import datetime
+from io import BytesIO
+import tempfile
 from unittest.mock import Mock, patch
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 
 from apps.courses.models import Course, CourseCategory
 from apps.franchise.models import (
@@ -15,6 +20,11 @@ from apps.franchise.models import (
     FranchiseProfile,
     FranchiseStaff,
     FranchiseStaffInvitation,
+)
+from apps.franchise.profile_images import (
+    MAX_PROFILE_IMAGE_SIZE,
+    PrivateProfileImageStorage,
+    validate_profile_image,
 )
 from apps.franchise.admin import FranchiseStaffAdmin
 from apps.franchise.admin import _send_activation_email
@@ -120,18 +130,11 @@ class FranchiseUpgradeIntegrationTests(TestCase):
         )
         self.assertRedirects(response, reverse("franchise:dashboard"))
 
-    def test_homepage_quick_access_and_navbar_franchise_login_visibility(self):
+    def test_homepage_hides_franchise_login_but_other_pages_keep_it(self):
         self.client.force_login(self.admin_user)
         home_response = self.client.get(reverse("core:home"))
-        home_navbar = home_response.content.decode().split("</nav>", 1)[0]
-        self.assertNotIn(
-            f'href="{reverse("franchise:login")}"',
-            home_navbar,
-        )
-        self.assertContains(
-            home_response,
-            f'href="{reverse("franchise:login")}"',
-        )
+        self.assertNotContains(home_response, "Franchise Login")
+        self.assertNotContains(home_response, reverse("franchise:login"))
         about_response = self.client.get(reverse("core:about"))
         self.assertContains(
             about_response,
@@ -148,7 +151,10 @@ class FranchiseUpgradeIntegrationTests(TestCase):
         response = self.client.get(reverse("franchise:login"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Django Admin accounts do not automatically")
+        self.assertNotContains(
+            response,
+            "Django Admin accounts do not automatically have franchise access.",
+        )
 
     def test_franchise_login_next_cannot_redirect_to_admin(self):
         owner_response = self.client.post(
@@ -724,6 +730,161 @@ class FranchiseUpgradeIntegrationTests(TestCase):
         self.assertEqual(student.franchise, self.franchise1)
         self.assertEqual(student.created_by, self.owner1_user)
         self.assertTrue(student.registration_number.startswith("RG-"))
+
+    def configure_temporary_profile_image_storage(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        for model in (Student, FranchiseProfile, FranchiseStaff):
+            storage = model._meta.get_field("profile_image").storage
+            original_backend = storage.backend
+            storage.backend = PrivateProfileImageStorage(
+                location=directory.name,
+                base_url="",
+            )
+            self.addCleanup(setattr, storage, "backend", original_backend)
+
+    @staticmethod
+    def profile_image_upload(name="student.png"):
+        image_data = BytesIO()
+        Image.new("RGB", (8, 8), color=(30, 120, 90)).save(
+            image_data,
+            format="PNG",
+        )
+        return SimpleUploadedFile(
+            name,
+            image_data.getvalue(),
+            content_type="image/png",
+        )
+
+    def test_student_photo_upload_is_private_and_franchise_scoped(self):
+        self.configure_temporary_profile_image_storage()
+        self.client.force_login(self.owner1_user)
+        response = self.client.post(
+            reverse("students:register"),
+            {
+                "full_name": "Photo Student",
+                "mobile": "9988776601",
+                "email": "photo@student.com",
+                "course": self.course.pk,
+                "university": self.university.pk,
+                "study_mode": "odl",
+                "admission_status": "admitted",
+                "fee_status": "paid",
+                "profile_image": self.profile_image_upload(),
+            },
+        )
+        self.assertRedirects(response, reverse("students:list"))
+        student = Student.objects.get(email="photo@student.com")
+        self.assertTrue(student.has_profile_image)
+        with self.assertRaises(ValueError):
+            _ = student.profile_image.url
+
+        photo_url = reverse("students:profile_image", kwargs={"pk": student.pk})
+        image_response = self.client.get(photo_url)
+        self.assertEqual(image_response.status_code, 200)
+        self.assertEqual(image_response["Content-Type"], "image/png")
+        self.assertEqual(image_response["Cache-Control"], "private, no-store")
+        self.assertEqual(image_response["X-Content-Type-Options"], "nosniff")
+        image_content = b"".join(image_response.streaming_content)
+        self.assertTrue(image_content.startswith(b"\x89PNG"))
+
+        self.client.force_login(self.owner2_user)
+        denied = self.client.get(photo_url)
+        self.assertEqual(denied.status_code, 404)
+        denied_edit = self.client.post(
+            reverse("students:edit", kwargs={"pk": student.pk}),
+            {
+                "full_name": "Changed",
+                "mobile": "9988776601",
+                "course": self.course.pk,
+                "university": self.university.pk,
+                "profile_image": self.profile_image_upload("other.png"),
+            },
+        )
+        self.assertEqual(denied_edit.status_code, 404)
+        student.refresh_from_db()
+        self.assertEqual(student.full_name, "Photo Student")
+
+    def test_owner_and_staff_can_update_only_their_own_profile_photo(self):
+        self.configure_temporary_profile_image_storage()
+        self.client.force_login(self.owner1_user)
+        response = self.client.post(
+            reverse("franchise:profile"),
+            {"profile_image": self.profile_image_upload("owner.png")},
+        )
+        self.assertRedirects(response, reverse("franchise:profile"))
+        self.franchise1.refresh_from_db()
+        self.assertTrue(self.franchise1.has_profile_image)
+        owner_photo = self.client.get(reverse("franchise:profile_photo"))
+        self.assertEqual(owner_photo.status_code, 200)
+        owner_photo.close()
+
+        self.client.force_login(self.staff1_user)
+        response = self.client.post(
+            reverse("franchise:staff_dashboard"),
+            {"profile_image": self.profile_image_upload("staff.png")},
+        )
+        self.assertRedirects(response, reverse("franchise:staff_dashboard"))
+        self.staff1.refresh_from_db()
+        self.assertTrue(self.staff1.has_profile_image)
+        staff_photo = self.client.get(reverse("franchise:profile_photo"))
+        self.assertEqual(staff_photo.status_code, 200)
+        staff_photo.close()
+
+        self.client.force_login(self.owner2_user)
+        response = self.client.post(
+            reverse("franchise:profile"),
+            {"profile_image": self.profile_image_upload("other-owner.png")},
+        )
+        self.assertRedirects(response, reverse("franchise:profile"))
+        self.franchise1.refresh_from_db()
+        self.assertTrue(self.franchise1.has_profile_image)
+        self.assertNotEqual(
+            self.franchise1.profile_image.name,
+            self.franchise2.profile_image.name,
+        )
+
+    def test_invalid_student_photo_is_rejected_and_missing_photo_uses_avatar(self):
+        self.client.force_login(self.owner1_user)
+        invalid = SimpleUploadedFile(
+            "not-an-image.png",
+            b"this is not an image",
+            content_type="image/png",
+        )
+        response = self.client.post(
+            reverse("students:register"),
+            {
+                "full_name": "Invalid Photo Student",
+                "mobile": "9988776602",
+                "course": self.course.pk,
+                "university": self.university.pk,
+                "profile_image": invalid,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].errors["profile_image"])
+        self.assertFalse(
+            Student.objects.filter(full_name="Invalid Photo Student").exists()
+        )
+        oversized = SimpleUploadedFile(
+            "oversized.png",
+            b"x" * (MAX_PROFILE_IMAGE_SIZE + 1),
+            content_type="image/png",
+        )
+        with self.assertRaises(ValidationError):
+            validate_profile_image(oversized)
+
+        student = Student.objects.create(
+            full_name="No Photo Student",
+            mobile="9988776603",
+            course=self.course,
+            university=self.university,
+            franchise=self.franchise1,
+        )
+        detail = self.client.get(
+            reverse("students:detail", kwargs={"pk": student.pk})
+        )
+        self.assertContains(detail, "profile-photo--default")
 
     def test_anonymous_and_unapproved_users_cannot_access_student_endpoints(self):
         student = Student.objects.create(

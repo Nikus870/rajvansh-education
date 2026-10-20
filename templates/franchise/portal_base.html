@@ -10,20 +10,20 @@
     <link href="{% static 'css/style.css' %}" rel="stylesheet">
     <style>
         :root {
-            --portal-navy: #f5f7fa;
-            --portal-blue: #f5b942;
-            --portal-sidebar-bg: #080b10;
+            --portal-navy: #F2F6F4;
+            --portal-blue: #43C59E;
+            --portal-sidebar-bg: #0B0F12;
             --portal-sidebar-width: 260px;
             --portal-top-height: 64px;
-            --portal-muted: #a7b0be;
-            --portal-border: #273241;
-            --portal-active-bg: rgba(245, 185, 66, 0.1);
-            --portal-active-color: #f5b942;
+            --portal-muted: #A6B5AF;
+            --portal-border: #2A3933;
+            --portal-active-bg: rgba(67, 197, 158, 0.1);
+            --portal-active-color: #43C59E;
         }
 
         body {
-            color: #f5f7fa;
-            background: #080b10;
+            color: #F2F6F4;
+            background: #0B0F12;
             min-height: 100vh;
         }
 
@@ -48,8 +48,8 @@
         }
 
         .portal-sidebar-brand .brand-mark {
-            background: linear-gradient(135deg, #f5b942, #e8a72e);
-            color: #17120a;
+            background: linear-gradient(135deg, #43C59E, #43C59E);
+            color: #0B0F12;
             font-weight: 700;
             font-size: 0.9rem;
             width: 36px;
@@ -93,7 +93,7 @@
             align-items: center;
             gap: 0.75rem;
             padding: 0.65rem 1.5rem;
-            color: #a7b0be;
+            color: #A6B5AF;
             text-decoration: none;
             font-size: 0.875rem;
             font-weight: 500;
@@ -130,8 +130,8 @@
             left: var(--portal-sidebar-width);
             right: 0;
             height: var(--portal-top-height);
-            background: #0e131b;
-            border-bottom: 1px solid #273241;
+            background: #11181A;
+            border-bottom: 1px solid #2A3933;
             z-index: 1030;
             display: flex;
             align-items: center;
@@ -144,23 +144,23 @@
             background: none;
             border: none;
             font-size: 1.4rem;
-            color: #f5f7fa;
+            color: #F2F6F4;
             padding: 0;
             cursor: pointer;
         }
 
         .portal-breadcrumb {
-            color: #a7b0be;
+            color: #A6B5AF;
             font-size: 0.82rem;
         }
 
         .portal-breadcrumb a {
-            color: #a7b0be;
+            color: #A6B5AF;
             text-decoration: none;
         }
 
         .portal-breadcrumb a:hover {
-            color: #f5b942;
+            color: #43C59E;
         }
 
         .portal-breadcrumb .separator {
@@ -178,14 +178,15 @@
             width: 36px;
             height: 36px;
             border-radius: 50%;
-            background: #f5b942;
-            color: #17120a;
+            background: #43C59E;
+            color: #0B0F12;
             font-weight: 700;
             font-size: 0.85rem;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            object-fit: cover;
         }
 
         /* ── Main content ─────────────────────────────────── */
@@ -199,11 +200,11 @@
 
         /* ── Stat cards ───────────────────────────────────── */
         .stat-card {
-            color: #f5f7fa;
-            background: #121923;
+            color: #F2F6F4;
+            background: #151E1D;
             border-radius: 12px;
             padding: 1.5rem;
-            border: 1px solid #273241;
+            border: 1px solid #2A3933;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
             height: 100%;
         }
@@ -217,19 +218,19 @@
             justify-content: center;
             font-size: 1.25rem;
             margin-bottom: 1rem;
-            color: #f5b942;
-            background: rgba(245, 185, 66, 0.1);
+            color: #43C59E;
+            background: rgba(67, 197, 158, 0.1);
         }
 
         .stat-card .stat-value {
             font-size: 2rem;
             font-weight: 700;
-            color: #f5f7fa;
+            color: #F2F6F4;
             line-height: 1;
         }
 
         .stat-card .stat-label {
-            color: #a7b0be;
+            color: #A6B5AF;
             font-size: 0.82rem;
             margin-top: 0.3rem;
         }
@@ -256,7 +257,7 @@
         }
 
         .chart-fallback {
-            color: #f5f7fa;
+            color: #F2F6F4;
             font-size: 0.875rem;
         }
 
@@ -267,46 +268,46 @@
         }
 
         .target-total span {
-            color: #a7b0be;
+            color: #A6B5AF;
             font-size: 1.1rem;
             font-weight: 500;
         }
 
         .student-target-progress {
             height: 0.7rem;
-            background: #273241;
+            background: #2A3933;
         }
 
         .student-target-progress .progress-bar {
-            background: linear-gradient(90deg, #e8a72e, #f5b942);
+            background: linear-gradient(90deg, #43C59E, #43C59E);
             transition: width 0.4s ease;
         }
 
         .target-remaining {
-            color: #f5f7fa;
+            color: #F2F6F4;
             font-size: 0.875rem;
         }
 
         .student-milestone-badge {
-            background: rgba(245, 185, 66, 0.12);
-            color: #f6d48a;
-            border: 1px solid rgba(245, 185, 66, 0.22);
+            background: rgba(67, 197, 158, 0.12);
+            color: #9AD8C2;
+            border: 1px solid rgba(67, 197, 158, 0.22);
             font-size: 0.82rem;
             padding: 0.55rem 0.75rem;
         }
 
         /* ── Portal card ──────────────────────────────────── */
         .portal-card {
-            color: #f5f7fa;
-            background: #121923;
+            color: #F2F6F4;
+            background: #151E1D;
             border-radius: 12px;
-            border: 1px solid #273241;
+            border: 1px solid #2A3933;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
         }
 
         .portal-card-header {
             padding: 1rem 1.5rem;
-            border-bottom: 1px solid #273241;
+            border-bottom: 1px solid #2A3933;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -316,7 +317,7 @@
             margin: 0;
             font-size: 0.95rem;
             font-weight: 600;
-            color: #f5f7fa;
+            color: #F2F6F4;
         }
 
         .portal-card-body {
@@ -334,22 +335,22 @@
         }
 
         .badge-pending,
-        .badge-partial { background: rgba(245, 185, 66, 0.12); color: #f6d48a; border-color: rgba(245, 185, 66, 0.2); }
+        .badge-partial { background: rgba(67, 197, 158, 0.12); color: #9AD8C2; border-color: rgba(67, 197, 158, 0.2); }
         .badge-approved,
         .badge-admitted,
         .badge-enrolled,
-        .badge-paid { background: rgba(53, 201, 138, 0.12); color: #72dfad; border-color: rgba(53, 201, 138, 0.2); }
+        .badge-paid { background: rgba(67, 197, 158, 0.12); color: #72dfad; border-color: rgba(67, 197, 158, 0.2); }
         .badge-rejected,
         .badge-cancelled { background: rgba(255, 100, 116, 0.12); color: #ff8d99; border-color: rgba(255, 100, 116, 0.2); }
-        .badge-waived { background: rgba(167, 176, 190, 0.12); color: #c6ccd5; border-color: rgba(167, 176, 190, 0.2); }
-        .badge-neutral { background: rgba(167, 176, 190, 0.12); color: #d0d5dd; border-color: rgba(167, 176, 190, 0.2); }
+        .badge-waived { background: rgba(166, 181, 175, 0.12); color: #c6ccd5; border-color: rgba(166, 181, 175, 0.2); }
+        .badge-neutral { background: rgba(166, 181, 175, 0.12); color: #d0d5dd; border-color: rgba(166, 181, 175, 0.2); }
 
         /* ── Forms ────────────────────────────────────────── */
         .portal-form-card {
-            color: #f5f7fa;
-            background: #121923;
+            color: #F2F6F4;
+            background: #151E1D;
             border-radius: 14px;
-            border: 1px solid #273241;
+            border: 1px solid #2A3933;
             padding: 2rem;
             box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
         }
@@ -415,20 +416,20 @@
 
         .portal-table th {
             font-weight: 600;
-            color: #a7b0be;
+            color: #A6B5AF;
             font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            border-bottom: 2px solid #273241;
+            border-bottom: 2px solid #2A3933;
             padding: 0.75rem 1rem;
             white-space: nowrap;
         }
 
         .portal-table td {
             padding: 0.85rem 1rem;
-            border-bottom: 1px solid #273241;
+            border-bottom: 1px solid #2A3933;
             vertical-align: middle;
-            color: #f5f7fa;
+            color: #F2F6F4;
         }
 
         .portal-table tr:last-child td {
@@ -442,32 +443,32 @@
         }
 
         .portal-main .table {
-            --bs-table-color: #f5f7fa;
+            --bs-table-color: #F2F6F4;
             --bs-table-bg: transparent;
-            --bs-table-border-color: #273241;
+            --bs-table-border-color: #2A3933;
         }
 
         .portal-main .dropdown-menu {
-            color: #f5f7fa;
-            border: 1px solid #273241;
-            background: #121923;
+            color: #F2F6F4;
+            border: 1px solid #2A3933;
+            background: #151E1D;
         }
 
         .portal-main .dropdown-item,
         .portal-main .dropdown-item-text {
-            color: #f5f7fa;
+            color: #F2F6F4;
         }
 
         .portal-main .dropdown-item:hover {
-            color: #f5b942;
-            background: #18212d;
+            color: #43C59E;
+            background: #1C2724;
         }
 
         /* ── Empty state ─────────────────────────────────── */
         .empty-state {
             text-align: center;
             padding: 3rem 1rem;
-            color: #a7b0be;
+            color: #A6B5AF;
         }
 
         .empty-state i {
@@ -584,9 +585,15 @@
 
     <div class="portal-topbar-right">
         <div class="dropdown">
-            <button type="button" class="portal-user-avatar border-0" data-bs-toggle="dropdown" aria-label="Open account menu" aria-expanded="false">
-                {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
-            </button>
+            {% if request.user.franchise_profile.has_profile_image or request.user.franchise_staff_profile.has_profile_image %}
+                <button type="button" class="portal-user-avatar border-0 p-0 overflow-hidden" data-bs-toggle="dropdown" aria-label="Open account menu" aria-expanded="false">
+                    <img class="w-100 h-100 object-fit-cover" src="{% url 'franchise:profile_photo' %}" alt="">
+                </button>
+            {% else %}
+                <button type="button" class="portal-user-avatar border-0" data-bs-toggle="dropdown" aria-label="Open account menu" aria-expanded="false">
+                    {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
+                </button>
+            {% endif %}
             <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                 <li>
                     <span class="dropdown-item-text small text-muted">

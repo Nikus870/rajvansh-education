@@ -24,6 +24,7 @@ from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.conf import settings
 from django.db import transaction
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import Resolver404, resolve, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -39,6 +40,8 @@ from .forms import (
     FranchisePasswordChangeForm,
     FranchiseForgotPasswordForm,
     FranchisePasswordResetForm,
+    FranchiseProfilePhotoForm,
+    FranchiseStaffPhotoForm,
 )
 from .analytics import get_student_growth_analytics
 from .models import (
@@ -47,6 +50,7 @@ from .models import (
     FranchiseStaff,
     FranchiseStaffInvitation,
 )
+from .profile_images import serve_profile_image
 
 logger = logging.getLogger(__name__)
 
@@ -183,13 +187,7 @@ def register(request):
 
 def franchise_login(request):
     if request.user.is_authenticated:
-        if request.user.is_superuser:
-            messages.info(
-                request,
-                "Django Admin accounts do not automatically have franchise access. "
-                "Use an approved franchise owner or staff account to sign in here.",
-            )
-        elif hasattr(request.user, "franchise_profile"):
+        if not request.user.is_superuser and hasattr(request.user, "franchise_profile"):
             return redirect("franchise:dashboard")
         try:
             staff_profile = (
@@ -424,6 +422,17 @@ def staff_dashboard(request):
         return redirect("franchise:dashboard")
 
     staff_profile = request.user.franchise_staff_profile
+    photo_form = FranchiseStaffPhotoForm(
+        request.POST or None,
+        request.FILES or None,
+        instance=staff_profile,
+    )
+    if request.method == "POST":
+        if photo_form.is_valid():
+            photo_form.save()
+            messages.success(request, "Your profile photo has been updated.")
+            return redirect("franchise:staff_dashboard")
+
     franchise = staff_profile.franchise
 
     from apps.students.models import Student
@@ -443,6 +452,7 @@ def staff_dashboard(request):
         "franchise/staff_dashboard.html",
         {
             "staff_profile": staff_profile,
+            "photo_form": photo_form,
             "franchise": franchise,
             "stats": stats,
             "analytics": analytics,
@@ -922,9 +932,34 @@ def franchise_profile(request):
         return redirect("franchise:staff_dashboard")
 
     profile = request.user.franchise_profile
+    photo_form = FranchiseProfilePhotoForm(
+        request.POST or None,
+        request.FILES or None,
+        instance=profile,
+    )
+    if request.method == "POST":
+        if photo_form.is_valid():
+            photo_form.save()
+            messages.success(request, "Your profile photo has been updated.")
+            return redirect("franchise:profile")
 
     return render(
         request,
         "franchise/profile.html",
-        {"profile": profile, "page_title": "Franchise Profile"},
+        {
+            "profile": profile,
+            "photo_form": photo_form,
+            "page_title": "Franchise Profile",
+        },
     )
+
+
+@portal_required
+def profile_photo(request):
+    if hasattr(request.user, "franchise_profile"):
+        profile = request.user.franchise_profile
+        return serve_profile_image(profile.profile_image)
+    if _active_staff_profile(request.user):
+        staff_profile = request.user.franchise_staff_profile
+        return serve_profile_image(staff_profile.profile_image)
+    raise Http404("Profile photo not found.")

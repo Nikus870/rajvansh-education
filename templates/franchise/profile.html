@@ -9,6 +9,29 @@
     <div class="col-lg-7">
         <h4 class="mb-4 fw-700">Franchise Profile</h4>
 
+        <div class="portal-card mb-3">
+            <div class="portal-card-header">
+                <h5><i class="bi bi-person-circle me-2 text-primary"></i>Profile Photo</h5>
+            </div>
+            <div class="portal-card-body d-flex align-items-center gap-3">
+                {% if profile.has_profile_image %}
+                    <img class="profile-photo profile-photo--large" src="{% url 'franchise:profile_photo' %}" alt="Your profile photo">
+                {% else %}
+                    <span class="profile-photo profile-photo--large profile-photo--default" aria-hidden="true"><i class="bi bi-person"></i></span>
+                {% endif %}
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <label for="{{ photo_form.profile_image.id_for_label }}" class="form-label fw-semibold">Update photo</label>
+                    {{ photo_form.profile_image }}
+                    <div class="form-text">JPEG, PNG, or WEBP; maximum 5 MB.</div>
+                    {% if photo_form.profile_image.errors %}
+                        <div class="text-danger small mt-1">{{ photo_form.profile_image.errors.0 }}</div>
+                    {% endif %}
+                    <button type="submit" class="btn btn-primary btn-sm mt-2">Save photo</button>
+                </form>
+            </div>
+        </div>
+
         <div class="portal-card">
             <div class="portal-card-header">
                 <h5><i class="bi bi-building me-2 text-primary"></i>Business Information</h5>

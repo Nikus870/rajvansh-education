@@ -7,6 +7,11 @@ from django.utils import timezone
 from apps.courses.models import Course
 from apps.universities.models import University
 from apps.franchise.models import FranchiseProfile
+from apps.franchise.profile_images import (
+    get_private_profile_image_storage,
+    profile_image_upload_to,
+    validate_profile_image,
+)
 
 
 def generate_registration_number():
@@ -106,6 +111,13 @@ class Student(models.Model):
 
     address = models.TextField(blank=True)
 
+    profile_image = models.ImageField(
+        upload_to=profile_image_upload_to,
+        storage=get_private_profile_image_storage,
+        validators=[validate_profile_image],
+        blank=True,
+    )
+
     # ── Academic details ──────────────────────────────────────────────────
     course = models.ForeignKey(
         Course,
@@ -175,6 +187,13 @@ class Student(models.Model):
 
     def __str__(self):
         return f"{self.registration_number} – {self.full_name}"
+
+    @property
+    def has_profile_image(self):
+        return bool(
+            self.profile_image
+            and self.profile_image.storage.exists(self.profile_image.name)
+        )
 
     def save(self, *args, **kwargs):
         if not self.registration_number:

@@ -15,7 +15,14 @@
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
             <div>
                 <span class="badge bg-primary mb-1">{{ student.registration_number }}</span>
-                <h4 class="mb-0 fw-700">{{ student.full_name }}</h4>
+                <div class="d-flex align-items-center gap-3">
+                    {% if student.has_profile_image %}
+                        <img class="profile-photo profile-photo--large" src="{% url 'students:profile_image' student.pk %}" alt="Photo of {{ student.full_name }}">
+                    {% else %}
+                        <span class="profile-photo profile-photo--large profile-photo--default" aria-hidden="true"><i class="bi bi-person"></i></span>
+                    {% endif %}
+                    <h4 class="mb-0 fw-700">{{ student.full_name }}</h4>
+                </div>
             </div>
             <div class="d-flex gap-2">
                 <a href="{% url 'students:list' %}" class="btn btn-outline-secondary btn-sm">
